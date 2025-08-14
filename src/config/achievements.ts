@@ -1,0 +1,186 @@
+import Achievement from '../models/Achievement';
+
+export const DEFAULT_ACHIEVEMENTS = [
+  // Streaks
+  {
+    code: 'streak_3',
+    title: 'Faithful Steps',
+    description: 'Check in 3 days in a row.',
+    category: 'streak',
+    tier: 'bronze',
+    requirement: { type: 'checkin_streak', value: 3 },
+    points: 10,
+    scriptureRef: 'Psalm 37:23',
+    blessingText: 'The Lord delights in your steady steps.',
+    icon: 'streak_bronze',
+  },
+  {
+    code: 'streak_7',
+    title: 'Weekly Walk',
+    description: 'Check in 7 days in a row.',
+    category: 'streak',
+    tier: 'silver',
+    requirement: { type: 'checkin_streak', value: 7 },
+    points: 25,
+    scriptureRef: 'Hebrews 12:1',
+    blessingText: 'Run with endurance the race set before you.',
+    icon: 'streak_silver',
+  },
+  { code: 'streak_14', title: 'Fortnight of Faith', description: 'Check in 14 days in a row.', category: 'streak', tier: 'silver', requirement: { type: 'checkin_streak', value: 14 }, points: 50, scriptureRef: 'Psalm 1:2-3', blessingText: 'Rooted by streams of living water.', icon: 'streak_silver_2' },
+  {
+    code: 'streak_21',
+    title: 'Daniel Fast of Faith',
+    description: 'Check in 21 days in a row.',
+    category: 'streak',
+    tier: 'gold',
+    requirement: { type: 'checkin_streak', value: 21 },
+    points: 75,
+    scriptureRef: 'Daniel 10:3',
+    blessingText: 'Your perseverance is heard in heaven.',
+    icon: 'streak_gold',
+  },
+  {
+    code: 'streak_40',
+    title: 'Wilderness Way',
+    description: 'Check in 40 days in a row.',
+    category: 'streak',
+    tier: 'platinum',
+    requirement: { type: 'checkin_streak', value: 40 },
+    points: 200,
+    scriptureRef: 'Matthew 4:2',
+    blessingText: 'Forty days of focus—God sustains you.',
+    icon: 'streak_platinum',
+  },
+  { code: 'streak_60', title: 'Pilgrim’s Path', description: 'Check in 60 days in a row.', category: 'streak', tier: 'platinum', requirement: { type: 'checkin_streak', value: 60 }, points: 280, scriptureRef: 'Psalm 84:5', blessingText: 'Blessed are those whose strength is in You.', icon: 'streak_platinum_2' },
+  { code: 'streak_90', title: 'Seasoned Sojourner', description: 'Check in 90 days in a row.', category: 'streak', tier: 'platinum', requirement: { type: 'checkin_streak', value: 90 }, points: 420, scriptureRef: 'Galatians 6:9', blessingText: 'In due season you shall reap.', icon: 'streak_platinum_3' },
+  // Prayers
+  {
+    code: 'prayer_1',
+    title: 'First Prayer',
+    description: 'Post your first prayer request.',
+    category: 'prayer',
+    tier: 'bronze',
+    requirement: { type: 'prayer_count', value: 1 },
+    points: 5,
+    scriptureRef: 'Philippians 4:6',
+    blessingText: 'In everything by prayer and supplication...',
+    icon: 'prayer_bronze',
+  },
+  {
+    code: 'prayer_5',
+    title: 'Prayerful Heart',
+    description: 'Post 5 prayer requests.',
+    category: 'prayer',
+    tier: 'silver',
+    requirement: { type: 'prayer_count', value: 5 },
+    points: 20,
+    scriptureRef: '1 Thessalonians 5:17',
+    blessingText: 'Pray without ceasing.',
+    icon: 'prayer_silver',
+  },
+  {
+    code: 'prayer_21',
+    title: 'Intercessor',
+    description: 'Post 21 prayer requests.',
+    category: 'prayer',
+    tier: 'gold',
+    requirement: { type: 'prayer_count', value: 21 },
+    points: 70,
+    scriptureRef: 'James 5:16',
+    blessingText: 'The prayer of the righteous is powerful and effective.',
+    icon: 'prayer_gold',
+  },
+  { code: 'prayer_50', title: 'Prayer Warrior', description: 'Post 50 prayer requests.', category: 'prayer', tier: 'platinum', requirement: { type: 'prayer_count', value: 50 }, points: 150, scriptureRef: 'Ephesians 6:18', blessingText: 'Praying at all times in the Spirit.', icon: 'prayer_platinum' },
+  { code: 'prayer_100', title: 'Incense Rising', description: 'Post 100 prayers.', category: 'prayer', tier: 'platinum', requirement: { type: 'prayer_count', value: 100 }, points: 300, scriptureRef: 'Revelation 5:8', blessingText: 'Golden bowls full of incense, which are the prayers of the saints.', icon: 'prayer_100' },
+  // Victories
+  {
+    code: 'victory_1',
+    title: 'First Victory',
+    description: 'Celebrate your first victory.',
+    category: 'victory',
+    tier: 'bronze',
+    requirement: { type: 'victory_count', value: 1 },
+    points: 10,
+    scriptureRef: '1 Corinthians 15:57',
+    blessingText: 'Thanks be to God, who gives us the victory through our Lord Jesus Christ.',
+    icon: 'victory_bronze',
+  },
+  {
+    code: 'victory_7',
+    title: 'Walls of Jericho',
+    description: 'Celebrate 7 victories.',
+    category: 'victory',
+    tier: 'silver',
+    requirement: { type: 'victory_count', value: 7 },
+    points: 40,
+    scriptureRef: 'Joshua 6:20',
+    blessingText: 'With persistence, walls fall.',
+    icon: 'victory_silver',
+  },
+  { code: 'victory_21', title: 'Persistent Praise', description: 'Celebrate 21 victories.', category: 'victory', tier: 'gold', requirement: { type: 'victory_count', value: 21 }, points: 90, scriptureRef: 'Psalm 34:1', blessingText: 'His praise shall continually be in my mouth.', icon: 'victory_gold' },
+  { code: 'victory_50', title: 'Overcomer', description: 'Celebrate 50 victories.', category: 'victory', tier: 'platinum', requirement: { type: 'victory_count', value: 50 }, points: 200, scriptureRef: 'Romans 8:37', blessingText: 'More than a conqueror through Him who loved us.', icon: 'victory_platinum' },
+  { code: 'victory_100', title: 'Banner of the Lord', description: 'Celebrate 100 victories.', category: 'victory', tier: 'platinum', requirement: { type: 'victory_count', value: 100 }, points: 350, scriptureRef: 'Exodus 17:15', blessingText: 'The Lord is my banner.', icon: 'victory_100' },
+  // Comments (encouragement)
+  {
+    code: 'encourage_3',
+    title: 'Encourager',
+    description: 'Leave 3 uplifting comments.',
+    category: 'comment',
+    tier: 'bronze',
+    requirement: { type: 'comment_count', value: 3 },
+    points: 10,
+    scriptureRef: 'Hebrews 10:24-25',
+    blessingText: 'Stirring others to love and good works.',
+    icon: 'comment_bronze',
+  },
+  {
+    code: 'encourage_10',
+    title: 'Barnabas',
+    description: 'Leave 10 uplifting comments.',
+    category: 'comment',
+    tier: 'silver',
+    requirement: { type: 'comment_count', value: 10 },
+    points: 30,
+    scriptureRef: 'Acts 11:24',
+    blessingText: 'A good person, full of the Holy Spirit and faith.',
+    icon: 'comment_silver',
+  },
+  { code: 'encourage_25', title: 'Voice of Comfort', description: 'Leave 25 uplifting comments.', category: 'comment', tier: 'gold', requirement: { type: 'comment_count', value: 25 }, points: 80, scriptureRef: 'Isaiah 40:1', blessingText: 'Comfort, comfort my people, says your God.', icon: 'comment_gold' },
+  { code: 'encourage_50', title: 'Peacemaker', description: 'Leave 50 uplifting comments.', category: 'comment', tier: 'platinum', requirement: { type: 'comment_count', value: 50 }, points: 160, scriptureRef: 'Matthew 5:9', blessingText: 'Blessed are the peacemakers.', icon: 'comment_platinum' },
+  { code: 'comments_100', title: 'Edifier', description: 'Leave 100 comments.', category: 'comment', tier: 'platinum', requirement: { type: 'comment_count', value: 100 }, points: 300, scriptureRef: 'Ephesians 4:29', blessingText: 'Only such as is good for building up.', icon: 'comment_100' },
+
+  // Check-in totals (milestones)
+  { code: 'checkins_3', title: 'Getting Started', description: 'Complete 3 check-ins.', category: 'streak', tier: 'bronze', requirement: { type: 'checkin_count', value: 3 }, points: 5, scriptureRef: 'Zechariah 4:10', blessingText: 'Do not despise small beginnings.', icon: 'checkins_3' },
+  { code: 'checkins_7', title: 'Holy Week Rhythm', description: 'Complete 7 check-ins.', category: 'streak', tier: 'bronze', requirement: { type: 'checkin_count', value: 7 }, points: 12, scriptureRef: 'Genesis 2:3', blessingText: 'God blessed the seventh day and made it holy.', icon: 'checkins_7' },
+  { code: 'checkins_10', title: 'First Steps', description: 'Complete 10 check-ins.', category: 'streak', tier: 'bronze', requirement: { type: 'checkin_count', value: 10 }, points: 10, scriptureRef: 'Proverbs 16:9', blessingText: 'The Lord establishes your steps.', icon: 'checkins_10' },
+  { code: 'checkins_30', title: 'Steady Walk', description: 'Complete 30 check-ins.', category: 'streak', tier: 'silver', requirement: { type: 'checkin_count', value: 30 }, points: 30, scriptureRef: 'Micah 6:8', blessingText: 'Walk humbly with your God.', icon: 'checkins_30' },
+  { code: 'checkins_50', title: 'Pentecost Pace', description: 'Complete 50 check-ins.', category: 'streak', tier: 'gold', requirement: { type: 'checkin_count', value: 50 }, points: 70, scriptureRef: 'Acts 2:1', blessingText: 'When the day of Pentecost arrived, they were all together.', icon: 'checkins_50' },
+  { code: 'checkins_100', title: 'Faithful Servant', description: 'Complete 100 check-ins.', category: 'streak', tier: 'gold', requirement: { type: 'checkin_count', value: 100 }, points: 120, scriptureRef: 'Matthew 25:21', blessingText: 'Well done, good and faithful servant.', icon: 'checkins_100' },
+  { code: 'checkins_150', title: 'Psalms Pilgrim', description: 'Complete 150 check-ins.', category: 'streak', tier: 'platinum', requirement: { type: 'checkin_count', value: 150 }, points: 200, scriptureRef: 'Psalms', blessingText: 'A song for every step of the journey.', icon: 'checkins_150' },
+  { code: 'checkins_365', title: 'Daily Bread', description: 'Complete 365 check-ins.', category: 'streak', tier: 'platinum', requirement: { type: 'checkin_count', value: 365 }, points: 500, scriptureRef: 'Matthew 6:11', blessingText: 'Give us this day our daily bread.', icon: 'checkins_365' },
+
+  // Composite/engagement achievements
+  { code: 'engage_7_7', title: 'Balanced Growth', description: 'Reach 7 prayers and 7 victories total.', category: 'engagement', tier: 'silver', requirement: { type: 'composite', value: 1, rules: [{ k: 'prayer_count', v: 7 }, { k: 'victory_count', v: 7 }] }, points: 60, scriptureRef: 'Luke 2:52', blessingText: 'Growing in wisdom and favor.', icon: 'engage_7_7' },
+  { code: 'engage_21_mix', title: 'Rule of Life', description: 'Any combination of 21 actions (prayers, victories, comments).', category: 'engagement', tier: 'gold', requirement: { type: 'composite_sum', value: 21, fields: ['prayer_count','victory_count','comment_count'] }, points: 100, scriptureRef: 'Colossians 3:17', blessingText: 'Do all in the name of the Lord Jesus.', icon: 'engage_21' },
+  { code: 'milestone_beatitudes', title: 'Beatitudes', description: 'Reach 8 total actions (any mix).', category: 'engagement', tier: 'silver', requirement: { type: 'composite_sum', value: 8, fields: ['prayer_count','victory_count','comment_count','checkin_count'] }, points: 25, scriptureRef: 'Matthew 5:3-10', blessingText: 'Blessed are the...', icon: 'milestone_beatitudes' },
+  { code: 'milestone_fruit_of_spirit', title: 'Fruit of the Spirit', description: 'Reach 9 total actions (any mix).', category: 'engagement', tier: 'silver', requirement: { type: 'composite_sum', value: 9, fields: ['prayer_count','victory_count','comment_count','checkin_count'] }, points: 28, scriptureRef: 'Galatians 5:22-23', blessingText: 'Love, joy, peace, patience, kindness...', icon: 'milestone_fruit' },
+  { code: 'milestone_psalm_23', title: 'Psalm 23', description: 'Reach 23 total actions (any mix).', category: 'engagement', tier: 'gold', requirement: { type: 'composite_sum', value: 23, fields: ['prayer_count','victory_count','comment_count','checkin_count'] }, points: 80, scriptureRef: 'Psalm 23', blessingText: 'The Lord is my shepherd.', icon: 'milestone_psalm23' },
+  { code: 'milestone_proverbs_31', title: 'Proverbs 31', description: 'Reach 31 total actions (any mix).', category: 'engagement', tier: 'gold', requirement: { type: 'composite_sum', value: 31, fields: ['prayer_count','victory_count','comment_count','checkin_count'] }, points: 110, scriptureRef: 'Proverbs 31', blessingText: 'Strength and dignity are her clothing.', icon: 'milestone_proverbs31' },
+  { code: 'milestone_john_3_16', title: 'John 3:16', description: 'Reach 16 total actions (any mix).', category: 'engagement', tier: 'silver', requirement: { type: 'composite_sum', value: 16, fields: ['prayer_count','victory_count','comment_count','checkin_count'] }, points: 50, scriptureRef: 'John 3:16', blessingText: 'For God so loved the world...', icon: 'milestone_john316' },
+
+  // Themed streak add-ons
+  { code: 'streak_sabbath_7', title: 'Sabbath Rhythm', description: 'Complete a 7 day streak including a Sabbath day.', category: 'streak', tier: 'silver', requirement: { type: 'checkin_streak', value: 7 }, points: 35, scriptureRef: 'Exodus 20:8', blessingText: 'Remember the Sabbath day, to keep it holy.', icon: 'streak_sabbath' },
+  { code: 'streak_resurrection_8', title: 'Eighth Day Joy', description: 'Go beyond the week into day 8 of your streak.', category: 'streak', tier: 'silver', requirement: { type: 'checkin_streak', value: 8 }, points: 38, scriptureRef: 'John 20:26', blessingText: 'On the eighth day, He meets you again.', icon: 'streak_8' },
+  { code: 'streak_apostles_12', title: 'Apostolic Consistency', description: 'Maintain a 12 day streak.', category: 'streak', tier: 'silver', requirement: { type: 'checkin_streak', value: 12 }, points: 45, scriptureRef: 'Revelation 21:14', blessingText: 'Built on foundations of faithful witness.', icon: 'streak_12' },
+];
+
+export const initializeDefaultAchievements = async (): Promise<void> => {
+  for (const item of DEFAULT_ACHIEVEMENTS) {
+    const existing = await Achievement.findOne({ where: { code: item.code } });
+    if (!existing) {
+      await Achievement.create(item as any);
+    }
+  }
+};
+
+
