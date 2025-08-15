@@ -17,7 +17,7 @@ export default async function recommendationsRoutes(fastify: FastifyInstance) {
 
     const rec = await DailyRecommendation.findOne({ where: { userId, localDate }, order: [['createdAt', 'DESC']] });
     if (!rec) return reply.status(404).send({ success: false, message: 'Recommendation not available yet', statusCode: 404 });
-
+     console.log({rec});
     return reply.send({
       success: true,
       message: 'OK',
@@ -66,6 +66,23 @@ export default async function recommendationsRoutes(fastify: FastifyInstance) {
     }));
 
     return reply.send({ items, page: currentPage, totalPages: Math.ceil(count / pageSize) });
+  });
+
+  fastify.post('/recommendations/generate', { preHandler: [authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { userId } = request as AuthenticatedFastifyRequest;
+    const tz = (request.headers['x-user-timezone'] as string) || 'UTC';
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+    const parts = formatter.formatToParts(now);
+    const yyyy = parts.find(p => p.type === 'year')?.value || '1970';
+    const mm = parts.find(p => p.type === 'month')?.value || '01';
+    const dd = parts.find(p => p.type === 'day')?.value || '01';
+    const localDate = `${yyyy}-${mm}-${dd}`;
+
+    const { enqueueGenerateDailyRecommendation } = await import('../jobs/recommendationJobs');
+    await enqueueGenerateDailyRecommendation({ userId, localDate, timezone: tz });
+
+    return reply.status(202).send({ success: true, message: 'Recommendation generation job enqueued.' });
   });
 }
 

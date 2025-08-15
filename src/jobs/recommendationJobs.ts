@@ -16,7 +16,7 @@ type GenerateDailyRecJob = {
 
 const youtube = google.youtube('v3');
 
-const buildLocalDate = (timezone: string, baseDate?: Date): string => {
+export const buildLocalDate = (timezone: string, baseDate?: Date): string => {
   const now = baseDate ?? new Date();
   const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const p = fmt.formatToParts(now);
@@ -26,7 +26,7 @@ const buildLocalDate = (timezone: string, baseDate?: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-const buildSearchQuery = (onboarding: OnboardingData | null): { query: string; bibleVersion?: string; preferredChannels: string[] } => {
+export const buildSearchQuery = (onboarding: OnboardingData | null): { query: string; bibleVersion?: string; preferredChannels: string[] } => {
   let bibleVersion: string | undefined;
   const preferredChannels: string[] = [];
   const parts: string[] = [];
@@ -48,7 +48,7 @@ const buildSearchQuery = (onboarding: OnboardingData | null): { query: string; b
   return base;
 };
 
-const maybeRefineQueryWithGemini = async (baseQuery: string, onboarding: OnboardingData | null): Promise<string> => {
+export const maybeRefineQueryWithGemini = async (baseQuery: string, onboarding: OnboardingData | null): Promise<string> => {
   if (!geminiConfig.apiKey) return baseQuery;
   try {
     const genAI = new GoogleGenerativeAI(geminiConfig.apiKey);
@@ -71,13 +71,13 @@ const fetchScripture = async (bibleVersion?: string): Promise<{ reference: strin
   return { reference: 'Psalm 23:1-3', text: `The LORD is my shepherd... (${version})` };
 };
 
-const searchYouTube = async (apiKey: string, query: string, preferredChannels: string[], excludeVideoIds: string[]): Promise<{ videoId: string; title: string; channelId: string; channelTitle: string; url: string } | null> => {
+export const searchYouTube = async (apiKey: string, query: string, preferredChannels: string[], excludeVideoIds: string[]): Promise<{ videoId: string; title: string; channelId: string; channelTitle: string; url: string } | null> => {
   const params: any = {
     key: apiKey,
-    part: ['snippet'],
+    part: 'snippet',
     q: query,
     maxResults: 10,
-    type: ['video'],
+    type: 'video',
     videoEmbeddable: 'true',
     order: 'relevance',
   };
@@ -175,7 +175,7 @@ export const scheduleDailyRecommendations = () => {
   nodeCron.schedule('0 * * * *', async () => {
     const users = await User.findAll({ where: { isActive: true }, include: [{ model: OnboardingData, as: 'onboardingData' }] });
     for (const user of users) {
-      const tz = (user as any).timezone || (user as any).onboardingData?.personalInfo?.timezone || 'UTC';
+      const tz = user.timezone || (user as any).onboardingData?.personalInfo?.timezone || 'UTC';
       const today = buildLocalDate(tz);
       const tomorrow = buildLocalDate(tz, new Date(Date.now() + 24 * 60 * 60 * 1000));
 

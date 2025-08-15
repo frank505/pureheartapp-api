@@ -105,7 +105,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Update progress and evaluate achievements
         await recordCheckInAndUpdateStreak(userId, checkIn.createdAt);
-        await evaluateAndUnlockAchievements(userId);
+        const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
         if (checkIn.visibility === 'partner' && checkIn.partnerIds) {
           await Promise.all(
@@ -129,7 +129,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Check-in created successfully',
-          data: checkIn,
+          data: { checkIn, newlyUnlocked },
           statusCode: 201,
         };
 
@@ -415,7 +415,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Update progress and evaluate achievements
         await incrementCounter(userId, 'prayerCount');
-        await evaluateAndUnlockAchievements(userId);
+        const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
         if (prayerRequest.visibility === 'group' && groupIds) {
           await (prayerRequest as any).addGroups(groupIds);
@@ -443,7 +443,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Prayer request created successfully',
-          data: prayerRequest,
+          data: { prayerRequest, newlyUnlocked },
           statusCode: 201,
         };
 
@@ -532,7 +532,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'requestingUser',
               attributes: ['id', 'username', 'avatar'],
             },
           ],
@@ -595,7 +595,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'requestingUser',
               attributes: ['id', 'username', 'avatar'],
             },
           ],
@@ -696,7 +696,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'requestingUser',
               attributes: ['id', 'username', 'avatar'],
             },
             {
@@ -749,7 +749,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'requestingUser',
               attributes: ['id', 'username', 'avatar'],
             },
             {
@@ -976,7 +976,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Update progress and evaluate achievements
         await incrementCounter(userId, 'victoryCount');
-        await evaluateAndUnlockAchievements(userId);
+        const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
         if (victory.visibility === 'group' && groupIds) {
           await (victory as any).addGroups(groupIds);
@@ -1004,7 +1004,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Victory created successfully',
-          data: victory,
+          data: { victory, newlyUnlocked },
           statusCode: 201,
         };
 
@@ -1094,7 +1094,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'victoriousUser',
               attributes: ['id', 'username', 'avatar'],
             },
           ],
@@ -1160,7 +1160,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'victoriousUser',
               attributes: ['id', 'username', 'avatar'],
             },
           ],
@@ -1262,7 +1262,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'victoriousUser',
               attributes: ['id', 'username', 'avatar'],
             },
             {
@@ -1316,7 +1316,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           include: [
             {
               model: User,
-              as: 'user',
+              as: 'victoriousUser',
               attributes: ['id', 'username', 'avatar'],
             },
             {
@@ -1530,8 +1530,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           attachments: attachments ?? null,
         });
 
-        await incrementCounter(userId, 'commentCount');
-        await evaluateAndUnlockAchievements(userId);
+        const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
 
         if (checkIn.userId !== userId) {
           await PushQueue.sendNotification({
@@ -1550,7 +1549,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Comment created successfully',
-          data: comment,
+          data: { comment, newlyUnlocked },
           statusCode: 201,
         };
 
@@ -1605,8 +1604,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           attachments: attachments ?? null,
         });
 
-        await incrementCounter(userId, 'commentCount');
-        await evaluateAndUnlockAchievements(userId);
+        const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
 
         if (prayerRequest.userId !== userId) {
           await PushQueue.sendNotification({
@@ -1625,7 +1623,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Comment created successfully',
-          data: comment,
+          data: { comment, newlyUnlocked },
           statusCode: 201,
         };
 
@@ -1680,8 +1678,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           attachments: attachments ?? null,
         });
 
-        await incrementCounter(userId, 'commentCount');
-        await evaluateAndUnlockAchievements(userId);
+        const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
 
         if (victory.userId !== userId) {
           await PushQueue.sendNotification({
@@ -1700,7 +1697,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Comment created successfully',
-          data: comment,
+          data: { comment, newlyUnlocked },
           statusCode: 201,
         };
 
