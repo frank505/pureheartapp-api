@@ -9,6 +9,8 @@ export interface IDailyRecommendation {
   bibleVersion?: string | null;
   scriptureReference?: string | null;
   scriptureText?: string | null;
+  prayerFocus?: string | null;
+  scripturesToPrayWith?: Array<{ reference: string; text?: string; version?: string; reason?: string }>| null;
   youtubeVideoId?: string | null;
   youtubeTitle?: string | null;
   youtubeChannelId?: string | null;
@@ -28,6 +30,8 @@ class DailyRecommendation extends Model<IDailyRecommendation, DailyRecommendatio
   public bibleVersion!: string | null;
   public scriptureReference!: string | null;
   public scriptureText!: string | null;
+  public prayerFocus!: string | null;
+  public scripturesToPrayWith!: Array<{ reference: string; text?: string; version?: string; reason?: string }>| null;
   public youtubeVideoId!: string | null;
   public youtubeTitle!: string | null;
   public youtubeChannelId!: string | null;
@@ -66,6 +70,16 @@ DailyRecommendation.init(
     scriptureText: {
       type: DataTypes.TEXT,
       allowNull: true,
+    },
+    prayerFocus: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'prayer_focus',
+    },
+    scripturesToPrayWith: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'scriptures_to_pray_with',
     },
     youtubeVideoId: {
       type: DataTypes.STRING(50),

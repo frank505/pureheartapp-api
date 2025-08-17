@@ -25,6 +25,7 @@ import DailyRecommendation from './DailyRecommendation';
 import Achievement from './Achievement';
 import UserAchievement from './UserAchievement';
 import UserProgress from './UserProgress';
+import TruthLies from './TruthLies';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -136,6 +137,7 @@ Group.belongsToMany(PrayerRequest, {
 
 // Export all models
 export {
+  sequelize,
   User,
   OnboardingData,
   AccountabilityPartner,
@@ -157,7 +159,7 @@ export {
   Achievement,
   UserAchievement,
   UserProgress,
-  sequelize,
+  TruthLies,
 };
 
 // Export a function to sync all models

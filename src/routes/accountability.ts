@@ -1077,6 +1077,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -1084,10 +1085,22 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       try {
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
-        console.log({page, limit});
+        const search = request.query.search?.trim();
+        console.log({page, limit, search});
+
+        // Build where condition
+        const whereCondition: any = { visibility: 'public' };
+        
+        // Add search filter if provided
+        if (search) {
+          whereCondition[Op.or] = [
+            { title: { [Op.iLike]: `%${search}%` } },
+            { body: { [Op.iLike]: `%${search}%` } }
+          ];
+        }
 
         const { count, rows } = await Victory.findAndCountAll({
-          where: { visibility: 'public' },
+          where: whereCondition,
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
@@ -1102,11 +1115,13 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         const response: IAPIResponse = {
           success: true,
-          message: 'Public victories retrieved successfully',
+          message: search ? `Public victories matching "${search}" retrieved successfully` : 'Public victories retrieved successfully',
           data: {
             items: rows,
             page,
             totalPages: Math.ceil(count / limit),
+            totalItems: count,
+            search: search || null,
           },
           statusCode: 200,
         };
