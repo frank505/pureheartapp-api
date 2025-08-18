@@ -281,6 +281,61 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Get phone numbers of all partners the authenticated user is accountable to
+  fastify.get('/partners/phones', { preHandler: [authenticate] }, async (request, reply) => {
+    const { userId } = request as AuthenticatedFastifyRequest;
+
+    try {
+      const acceptedInvites = await AccountabilityPartner.findAll({
+        where: {
+          usedAt: { [Op.not]: null },
+          [Op.or]: [{ userId }, { receiverId: userId }],
+          phoneNumber: { [Op.not]: null }, // Only get partnerships with phone numbers
+        },
+        attributes: ['id', 'phoneNumber', 'userId', 'receiverId', 'usedAt'],
+        include: [
+          { model: User, as: 'sender', attributes: ['id', 'email', 'firstName', 'lastName'] },
+          { model: User, as: 'receiver', attributes: ['id', 'email', 'firstName', 'lastName'] },
+        ],
+        order: [['usedAt', 'DESC']],
+      });
+
+      const phoneNumbers = acceptedInvites
+        .map((invitation) => {
+          const json = (invitation.toJSON ? invitation.toJSON() : (invitation as any)) as any;
+          const partnerUser = json.sender && json.sender.id === userId ? json.receiver : json.sender;
+          const name = partnerUser
+            ? [partnerUser.firstName, partnerUser.lastName].filter(Boolean).join(' ').trim()
+            : null;
+          return {
+            partnerId: invitation.id,
+            phoneNumber: invitation.phoneNumber,
+            name,
+            email: partnerUser ? partnerUser.email : null,
+          };
+        })
+        .filter(item => !!item.phoneNumber); // Extra filter to ensure no null values
+
+      return reply.send({ 
+        success: true,
+        message: 'Partner phone numbers retrieved successfully',
+        data: {
+          phoneNumbers,
+          count: phoneNumbers.length
+        },
+        statusCode: 200
+      });
+    } catch (error) {
+      request.log.error('Error fetching partner phone numbers:', error);
+      return reply.status(500).send({ 
+        success: false,
+        message: 'Failed to retrieve partner phone numbers',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: 500
+      });
+    }
+  });
+
   // Revoke an invitation by ID (only by sender and only if not yet used)
   fastify.post('/invites/invitations/:id/revoke', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string };

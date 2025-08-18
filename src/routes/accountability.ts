@@ -133,11 +133,11 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const response: IAPIResponse = {
           success: true,
           message: 'Check-in created successfully',
-          data: { checkIn, newlyUnlocked },
-          statusCode: 201,
+          data: { checkIn, newlyUnlocked, status },
+          statusCode: 200,
         };
 
-        reply.status(201).send(response);
+        reply.status(200).send(response);
       } catch (error: any) {
         const response: IAPIResponse = {
           success: false,
