@@ -3,6 +3,7 @@ import sequelize from '../config/database';
 import AccountabilityPartner from './AccountabilityPartner';
 
 export type CheckInVisibility = 'private' | 'partner' | 'group';
+export type CheckInStatus = 'victory' | 'relapse';
 
 export interface IAccountabilityCheckIn {
   id: number; // uuid
@@ -12,6 +13,7 @@ export interface IAccountabilityCheckIn {
   mood: number; // 0..1
   note?: string | null;
   visibility: CheckInVisibility;
+  status: CheckInStatus; // marks whether this check-in was a victory day or a relapse
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -33,6 +35,7 @@ class AccountabilityCheckIn
   public mood!: number;
   public note!: string | null;
   public visibility!: CheckInVisibility;
+  public status!: CheckInStatus;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public readonly deletedAt!: Date | null;
@@ -71,6 +74,7 @@ AccountabilityCheckIn.init(
     mood: { type: DataTypes.DECIMAL(3, 2), allowNull: false },
     note: { type: DataTypes.TEXT, allowNull: true },
     visibility: { type: DataTypes.ENUM('private', 'partner', 'group'), allowNull: false, defaultValue: 'private' },
+  status: { type: DataTypes.ENUM('victory', 'relapse'), allowNull: false, defaultValue: 'victory' },
     createdAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'created_at' },
     updatedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'updated_at' },
     deletedAt: { type: DataTypes.DATE, allowNull: true, field: 'deleted_at' },

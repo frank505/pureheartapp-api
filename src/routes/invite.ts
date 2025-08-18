@@ -103,7 +103,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     '/invites/send-by-email',
     { preHandler: [authenticate] },
     async (request, reply) => {
-      const { emails, hash } = request.body;
+      const { emails, hash, phoneNumber } = request.body;
       const { userId } = request as AuthenticatedFastifyRequest;
 
       if (!emails || !Array.isArray(emails) || emails.length === 0) {
@@ -127,6 +127,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
             const invitation = await AccountabilityPartner.create({
               userId,
               hash: invitationHash,
+              phoneNumber: phoneNumber || null,
             });
             await emailService.sendAccountabilityInviteEmail(
               email,
@@ -268,6 +269,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         return {
           id: invitation.id,
           since: invitation.usedAt ?? invitation.createdAt,
+          phoneNumber: invitation.phoneNumber,
           partner,
         };
       });
@@ -304,8 +306,8 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
   });
 
   // Save an invitation hash for the authenticated user (create pending invitation)
-  fastify.post<{ Body: { hash: string } }>('/invites/invitations', { preHandler: [authenticate] }, async (request, reply) => {
-    const { hash } = request.body || ({} as any);
+  fastify.post<{ Body: { hash: string; phoneNumber?: string } }>('/invites/invitations', { preHandler: [authenticate] }, async (request, reply) => {
+    const { hash, phoneNumber } = request.body || ({} as any);
     const { userId } = request as AuthenticatedFastifyRequest;
 
     if (!hash || typeof hash !== 'string' || hash.trim().length === 0) {
@@ -316,13 +318,17 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       const existing = await AccountabilityPartner.findOne({ where: { hash } });
       if (existing) {
         if (existing.userId === userId && !existing.usedAt && !existing.receiverId) {
-          return reply.status(200).send({ id: existing.id, hash: existing.hash });
+          return reply.status(200).send({ id: existing.id, hash: existing.hash, phoneNumber: existing.phoneNumber });
         }
         return reply.status(409).send({ success: false, message: 'Invitation hash already in use' });
       }
 
-      const created = await AccountabilityPartner.create({ userId, hash });
-      return reply.status(201).send({ id: created.id, hash: created.hash });
+      const created = await AccountabilityPartner.create({ 
+        userId, 
+        hash,
+        phoneNumber: phoneNumber || null 
+      });
+      return reply.status(201).send({ id: created.id, hash: created.hash, phoneNumber: created.phoneNumber });
     } catch (error) {
       request.log.error('Error saving invitation hash:', error);
       return reply.status(500).send({ success: false, message: 'Failed to save invitation hash' });

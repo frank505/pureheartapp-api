@@ -28,9 +28,12 @@ import { initializeTruthLiesWorker, closeTruthLiesWorker } from './jobs/truthLie
 import progressRoutes from './routes/progress';
 import truthLiesRoutes from './routes/truthLies';
 import { initializeDefaultAchievements } from './config/achievements';
+import aiChatRoutes from './routes/aichat';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
+import './models/AIChatSession';
+import './models/AIChatMessage';
 
 /**
  * Create and configure Fastify server instance
@@ -279,6 +282,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(recommendationsRoutes, { prefix: '/api' });
   await fastify.register(progressRoutes, { prefix: '/api' });
   await fastify.register(truthLiesRoutes, { prefix: '/api' });
+  await fastify.register(aiChatRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {

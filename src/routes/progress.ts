@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } f
 import { authenticate, AuthenticatedFastifyRequest } from '../middleware/auth';
 import { IAPIResponse } from '../types/auth';
 import AccountabilityCheckIn, { CheckInVisibility } from '../models/AccountabilityCheckIn';
+import type { CheckInStatus } from '../models/AccountabilityCheckIn';
 import { Op } from 'sequelize';
 import { getAnalytics, getCalendarForMonth, getAchievementsForUser, evaluateAndUnlockAchievements, recordCheckInAndUpdateStreak } from '../services/progressService';
 import { PushQueue } from '../jobs/notificationJobs';
@@ -19,6 +20,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         visibility: { type: 'string', enum: ['private', 'partner', 'group'] },
         partnerIds: { type: 'array', items: { type: 'number' } },
         groupIds: { type: 'array', items: { type: 'number' } },
+  status: { type: 'string', enum: ['victory', 'relapse'] },
       },
     },
   } as const;
@@ -35,12 +37,13 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           visibility?: CheckInVisibility;
           partnerIds?: number[];
           groupIds?: number[];
+          status?: CheckInStatus;
         };
       }>,
       reply: FastifyReply
     ) => {
       try {
-        const { mood, note, visibility = 'private', partnerIds, groupIds } = request.body;
+  const { mood, note, visibility = 'private', partnerIds, groupIds, status = 'victory' } = request.body;
         const userId = (request as AuthenticatedFastifyRequest).userId;
 
         if (mood === undefined || mood < 0 || mood > 1) {
@@ -67,10 +70,11 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           visibility,
           partnerIds: visibility === 'partner' ? partnerIds ?? null : null,
           groupIds: visibility === 'group' ? groupIds ?? null : null,
+          status,
         });
 
         // Update progress and evaluate achievements
-        await recordCheckInAndUpdateStreak(userId, checkIn.createdAt);
+  await recordCheckInAndUpdateStreak(userId, checkIn.createdAt, checkIn.getDataValue('status') as any);
         const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
         if (checkIn.visibility === 'partner' && checkIn.partnerIds) {

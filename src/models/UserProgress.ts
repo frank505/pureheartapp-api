@@ -12,6 +12,7 @@ export interface IUserProgress {
   currentCheckInStreak: number;
   longestCheckInStreak: number;
   lastCheckInDate?: Date | null;
+  lastRelapseDate?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -32,6 +33,7 @@ class UserProgress extends Model<IUserProgress, UserProgressCreation> implements
   public currentCheckInStreak!: number;
   public longestCheckInStreak!: number;
   public lastCheckInDate!: Date | null;
+  public lastRelapseDate!: Date | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public readonly deletedAt!: Date | null;
@@ -48,6 +50,7 @@ UserProgress.init(
     currentCheckInStreak: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'current_checkin_streak' },
     longestCheckInStreak: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'longest_checkin_streak' },
     lastCheckInDate: { type: DataTypes.DATE, allowNull: true, field: 'last_checkin_date' },
+  lastRelapseDate: { type: DataTypes.DATE, allowNull: true, field: 'last_relapse_date' },
     createdAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'created_at' },
     updatedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'updated_at' },
     deletedAt: { type: DataTypes.DATE, allowNull: true, field: 'deleted_at' },

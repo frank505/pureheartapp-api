@@ -12,13 +12,14 @@ export interface IAccountabilityPartner {
   hash: string; // The unique invitation hash value
   receiverId?: number | null; // The ID of the user who accepted the invitation
   usedAt?: Date | null; // The timestamp when the invitation was used
+  phoneNumber?: string | null; // Optional phone number for the partner
 }
 
 /**
  * Interface for creating a new AccountabilityPartner.
  * Some fields are optional during creation.
  */
-interface AccountabilityPartnerCreationAttributes extends Optional<IAccountabilityPartner, 'id' | 'receiverId' | 'usedAt'> {}
+interface AccountabilityPartnerCreationAttributes extends Optional<IAccountabilityPartner, 'id' | 'receiverId' | 'usedAt' | 'phoneNumber'> {}
 
 /**
  * AccountabilityPartner Model Class
@@ -30,6 +31,7 @@ class AccountabilityPartner extends Model<IAccountabilityPartner, Accountability
   public hash!: string;
   public receiverId!: number | null;
   public usedAt!: Date | null;
+  public phoneNumber!: string | null;
 
   // Timestamps are automatically managed by Sequelize
   public readonly createdAt!: Date;
@@ -74,6 +76,12 @@ AccountabilityPartner.init(
       type: DataTypes.DATE,
       allowNull: true,
       field: 'used_at',
+    },
+    // Optional phone number for the partner
+    phoneNumber: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'phone_number',
     },
   },
   {

@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } f
 import { IAPIResponse } from '../types/auth';
 import AccountabilityCheckIn from '../models/AccountabilityCheckIn';
 import { CheckInVisibility } from '../models/AccountabilityCheckIn';
+import type { CheckInStatus } from '../models/AccountabilityCheckIn';
 import {
   IPrayerRequest,
   default as PrayerRequest,
@@ -39,6 +40,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         visibility: { type: 'string', enum: ['private', 'partner', 'group', 'public'] },
         partnerIds: { type: 'array', items: { type: 'number' } },
         groupIds: { type: 'array', items: { type: 'number' } },
+  status: { type: 'string', enum: ['victory', 'relapse'] },
       },
     },
   };
@@ -55,12 +57,13 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           visibility?: CheckInVisibility;
           partnerIds?: number[];
           groupIds?: number[];
+          status?: CheckInStatus;
         };
       }>,
       reply: FastifyReply
     ) => {
       try {
-        const { mood, note, visibility = 'private', partnerIds, groupIds } = request.body;
+  const { mood, note, visibility = 'private', partnerIds, groupIds, status = 'victory' } = request.body;
         const userId = (request as AuthenticatedFastifyRequest).userId;
 
         // Basic validation
@@ -101,10 +104,11 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           visibility,
           partnerIds: visibility === 'partner' ? partnerIds ?? null : null,
           groupIds: visibility === 'group' ? groupIds ?? null : null,
+          status,
         });
 
         // Update progress and evaluate achievements
-        await recordCheckInAndUpdateStreak(userId, checkIn.createdAt);
+  await recordCheckInAndUpdateStreak(userId, checkIn.createdAt, checkIn.getDataValue('status') as any);
         const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
         if (checkIn.visibility === 'partner' && checkIn.partnerIds) {
@@ -156,13 +160,14 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           to?: string;
           page?: number;
           limit?: number;
+          status?: 'victory' | 'relapse';
         };
       }>,
       reply: FastifyReply
     ) => {
       try {
         const userId = (request as AuthenticatedFastifyRequest).userId;
-        const { from, to } = request.query;
+  const { from, to, status } = request.query as any;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
 
@@ -171,6 +176,9 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           where.createdAt = {
             [Op.between]: [new Date(from), new Date(to)],
           };
+        }
+        if (status) {
+          where.status = status;
         }
 
         const { count, rows } = await AccountabilityCheckIn.findAndCountAll({
@@ -259,6 +267,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           mood?: number;
           note?: string;
           visibility?: CheckInVisibility;
+          status?: CheckInStatus;
         };
       }>,
       reply: FastifyReply
@@ -266,7 +275,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       try {
         const userId = (request as AuthenticatedFastifyRequest).userId;
         const { id } = request.params;
-        const { mood, note, visibility } = request.body;
+  const { mood, note, visibility, status } = request.body;
 
         const checkIn = await AccountabilityCheckIn.findOne({ where: { id: Number(id), userId } });
 
@@ -283,6 +292,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         if (mood !== undefined) checkIn.mood = mood;
         if (note !== undefined) checkIn.note = note;
         if (visibility !== undefined) checkIn.visibility = visibility;
+  if (status !== undefined) (checkIn as any).status = status;
 
         await checkIn.save();
 
@@ -468,6 +478,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -476,9 +487,17 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const userId = (request as AuthenticatedFastifyRequest).userId;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
+        const whereCondition: any = { userId };
+        if (search) {
+          whereCondition[Op.or] = [
+            { title: { [Op.iLike]: `%${search}%` } },
+            { body: { [Op.iLike]: `%${search}%` } },
+          ];
+        }
 
         const { count, rows } = await PrayerRequest.findAndCountAll({
-          where: { userId },
+          where: whereCondition,
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
@@ -516,6 +535,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -523,9 +543,18 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       try {
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
+
+        const whereCondition: any = { visibility: 'public' };
+        if (search) {
+          whereCondition[Op.or] = [
+            { title: { [Op.iLike]: `%${search}%` } },
+            { body: { [Op.iLike]: `%${search}%` } },
+          ];
+        }
 
         const { count, rows } = await PrayerRequest.findAndCountAll({
-          where: { visibility: 'public' },
+          where: whereCondition,
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
@@ -571,6 +600,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -580,11 +610,19 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const { userId: targetUserId } = request.params;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
 
         const where: any = { userId: Number(targetUserId) };
 
         if (requesterId !== Number(targetUserId)) {
           where.visibility = 'public';
+        }
+
+        if (search) {
+          where[Op.or] = [
+            { title: { [Op.iLike]: `%${search}%` } },
+            { body: { [Op.iLike]: `%${search}%` } },
+          ];
         }
 
         const { count, rows } = await PrayerRequest.findAndCountAll({
@@ -633,6 +671,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -641,6 +680,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const userId = (request as AuthenticatedFastifyRequest).userId;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
 
         // Get all group IDs the user is a member of
         const groupMemberships = await GroupMember.findAll({ where: { userId }, attributes: ['groupId'] });
@@ -686,10 +726,21 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           });
         }
 
+        // Combine visibility/relationship conditions with optional search filter
+        const where: any = { [Op.or]: conditions };
+        const andClauses: any[] = [];
+        if (search) {
+          andClauses.push({
+            [Op.or]: [
+              { title: { [Op.iLike]: `%${search}%` } },
+              { body: { [Op.iLike]: `%${search}%` } },
+            ],
+          });
+        }
+        const finalWhere = andClauses.length ? { [Op.and]: [where, ...andClauses] } : where;
+
         const { count, rows } = await PrayerRequest.findAndCountAll({
-          where: {
-            [Op.or]: conditions,
-          },
+          where: finalWhere,
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
@@ -1029,6 +1080,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -1037,9 +1089,17 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const userId = (request as AuthenticatedFastifyRequest).userId;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
+        const whereCondition: any = { userId };
+        if (search) {
+          whereCondition[Op.or] = [
+            { title: { [Op.iLike]: `%${search}%` } },
+            { body: { [Op.iLike]: `%${search}%` } },
+          ];
+        }
 
         const { count, rows } = await Victory.findAndCountAll({
-          where: { userId },
+          where: whereCondition,
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
@@ -1149,6 +1209,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -1158,6 +1219,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const { userId: targetUserId } = request.params;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
 
         const where: any = { userId: Number(targetUserId) };
 
@@ -1165,6 +1227,13 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         // only show public victories.
         if (requesterId !== Number(targetUserId)) {
           where.visibility = 'public';
+        }
+
+        if (search) {
+          where[Op.or] = [
+            { title: { [Op.iLike]: `%${search}%` } },
+            { body: { [Op.iLike]: `%${search}%` } },
+          ];
         }
 
         const { count, rows } = await Victory.findAndCountAll({
@@ -1214,6 +1283,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         Querystring: {
           page?: number;
           limit?: number;
+          search?: string;
         };
       }>,
       reply: FastifyReply
@@ -1222,6 +1292,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const userId = (request as AuthenticatedFastifyRequest).userId;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
+        const search = request.query.search?.trim();
 
         // Get all group IDs the user is a member of
         const groupMemberships = await GroupMember.findAll({ where: { userId }, attributes: ['groupId'] });
@@ -1267,10 +1338,21 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           });
         }
 
+        // Combine visibility/relationship conditions with optional search filter
+        const where: any = { [Op.or]: conditions };
+        const andClauses: any[] = [];
+        if (search) {
+          andClauses.push({
+            [Op.or]: [
+              { title: { [Op.iLike]: `%${search}%` } },
+              { body: { [Op.iLike]: `%${search}%` } },
+            ],
+          });
+        }
+        const finalWhere = andClauses.length ? { [Op.and]: [where, ...andClauses] } : where;
+
         const { count, rows } = await Victory.findAndCountAll({
-          where: {
-            [Op.or]: conditions,
-          },
+          where: finalWhere,
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
@@ -1536,6 +1618,16 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           return reply.status(404).send(response);
         }
 
+
+        if(checkIn.visibility === 'private' && checkIn.userId !== userId) {
+          const response: IAPIResponse = {
+            success: false,
+            message: 'You do not have permission to comment on this check-in',
+            statusCode: 403,
+          };
+          return reply.status(403).send(response);
+        }
+
         const comment = await AccountabilityComment.create({
           userId,
           targetType: 'checkin',
@@ -1776,7 +1868,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
     }
   };
 
-  fastify.get<{ Params: { id: string }; Querystring: { page?: number; limit?: number } }>('/checkins/:id/comments', (req, reply) => getCommentsHandler(req, reply, 'checkin'));
+  fastify.get<{ Params: { id: string }; Querystring: { page?: number; limit?: number } }>('/get/checkins/comments/:id', (req, reply) => getCommentsHandler(req, reply, 'checkin'));
   fastify.get<{ Params: { id: string }; Querystring: { page?: number; limit?: number } }>('/prayer-requests/:id/comments', (req, reply) =>
     getCommentsHandler(req, reply, 'prayer_request')
   );
@@ -1791,7 +1883,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const checkIns = await AccountabilityCheckIn.findAll({
           where: { userId },
           order: [['createdAt', 'ASC']],
-          attributes: ['createdAt'],
+          attributes: ['createdAt', 'status'],
         });
 
         if (checkIns.length === 0) {
@@ -1810,36 +1902,36 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         let currentStreak = 0;
         let longestStreak = 0;
         let streakDates: Date[] = [];
-        
-        if (checkIns.length > 0 && checkIns[0]) {
-            currentStreak = 1;
-            longestStreak = 1;
-            streakDates.push(checkIns[0].createdAt);
-        }
 
-        for (let i = 1; i < checkIns.length; i++) {
+        for (let i = 0; i < checkIns.length; i++) {
           const current = checkIns[i];
-          const previous = checkIns[i - 1];
-          if (!current || !previous) continue;
+          if (!current) continue;
+          const prev = i > 0 ? checkIns[i - 1] : null;
           const currentDate = new Date(current.createdAt);
-          const previousDate = new Date(previous.createdAt);
-          const diffTime = Math.abs(currentDate.getTime() - previousDate.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays === 1) {
-            currentStreak++;
-            streakDates.push(current.createdAt);
-          } else if (diffDays > 1) {
-            if (currentStreak > longestStreak) {
-              longestStreak = currentStreak;
-            }
+          if ((current as any).status === 'relapse') {
+            // relapse resets the streak
+            if (currentStreak > longestStreak) longestStreak = currentStreak;
+            currentStreak = 0;
+            streakDates = [];
+            continue;
+          }
+          if (!prev || (prev as any).status === 'relapse') {
             currentStreak = 1;
             streakDates = [current.createdAt];
+          } else {
+            const previousDate = new Date(prev.createdAt);
+            const diffTime = Math.abs(currentDate.getTime() - previousDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) {
+              currentStreak++;
+              streakDates.push(current.createdAt);
+            } else if (diffDays > 1) {
+              if (currentStreak > longestStreak) longestStreak = currentStreak;
+              currentStreak = 1;
+              streakDates = [current.createdAt];
+            }
           }
-        }
-        
-        if (currentStreak > longestStreak) {
-            longestStreak = currentStreak;
+          if (currentStreak > longestStreak) longestStreak = currentStreak;
         }
 
         const response: IAPIResponse = {
@@ -1910,4 +2002,183 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
   fastify.delete<{ Params: { id: string, commentId: string } }>('/checkins/:id/comments/:commentId', deleteCommentHandler);
   fastify.delete<{ Params: { id: string, commentId: string } }>('/prayer-requests/:id/comments/:commentId', deleteCommentHandler);
   fastify.delete<{ Params: { id: string, commentId: string } }>('/victories/:id/comments/:commentId', deleteCommentHandler);
+
+  // GET /partners/:id/phone - Get phone number of a specific accountability partner
+  const getPartnerPhoneSchema = {
+    params: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string' },
+      },
+    },
+  };
+
+  fastify.get(
+    '/partners/:id/phone',
+    { schema: getPartnerPhoneSchema },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const partnerId = parseInt(request.params.id, 10);
+        const userId = (request as AuthenticatedFastifyRequest).userId;
+
+        if (isNaN(partnerId)) {
+          const response: IAPIResponse = {
+            success: false,
+            message: 'Invalid partner ID',
+            error: 'Partner ID must be a valid number.',
+            statusCode: 400,
+          };
+          return reply.status(400).send(response);
+        }
+
+        // Find the accountability partner where the user is accountable to the partner
+        const partner = await AccountabilityPartner.findOne({
+          where: {
+            id: partnerId,
+            [Op.or]: [
+              { userId: userId },
+              { receiverId: userId }
+            ],
+            receiverId: { [Op.ne]: null }, // ensure partnership is established
+            usedAt: { [Op.ne]: null }, // ensure partnership is used/active
+          }
+        });
+
+        if (!partner) {
+          const response: IAPIResponse = {
+            success: false,
+            message: 'Partner not found',
+            error: 'The specified accountability partner was not found or you do not have permission to view it.',
+            statusCode: 404,
+          };
+          return reply.status(404).send(response);
+        }
+
+        const response: IAPIResponse = {
+          success: true,
+          message: 'Partner phone number retrieved successfully',
+          data: {
+            id: partner.id,
+            phoneNumber: partner.phoneNumber,
+          },
+          statusCode: 200,
+        };
+        reply.status(200).send(response);
+      } catch (error: any) {
+        const response: IAPIResponse = {
+          success: false,
+          message: 'Failed to retrieve partner phone number',
+          error: error.message,
+          statusCode: 500,
+        };
+        reply.status(500).send(response);
+      }
+    }
+  );
+
+  // PATCH /partners/:id/phone - Update phone number for an accountability partner
+  const updatePartnerPhoneSchema = {
+    params: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string' },
+      },
+    },
+    body: {
+      type: 'object',
+      required: ['phoneNumber'],
+      properties: {
+        phoneNumber: { type: 'string' },
+      },
+    },
+  };
+
+  fastify.patch(
+    '/partners/:id/phone',
+    { schema: updatePartnerPhoneSchema },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: { phoneNumber: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const partnerId = parseInt(request.params.id, 10);
+        const { phoneNumber } = request.body;
+        const userId = (request as AuthenticatedFastifyRequest).userId;
+
+        if (isNaN(partnerId)) {
+          const response: IAPIResponse = {
+            success: false,
+            message: 'Invalid partner ID',
+            error: 'Partner ID must be a valid number.',
+            statusCode: 400,
+          };
+          return reply.status(400).send(response);
+        }
+
+        // Basic phone number validation (optional but recommended)
+        if (phoneNumber && phoneNumber.trim().length === 0) {
+          const response: IAPIResponse = {
+            success: false,
+            message: 'Validation failed',
+            error: 'Phone number cannot be empty.',
+            statusCode: 400,
+          };
+          return reply.status(400).send(response);
+        }
+
+        // Find the accountability partner
+        const partner = await AccountabilityPartner.findOne({
+          where: {
+            id: partnerId,
+            [Op.or]: [
+              { userId: userId },
+              { receiverId: userId }
+            ]
+          }
+        });
+
+        if (!partner) {
+          const response: IAPIResponse = {
+            success: false,
+            message: 'Partner not found',
+            error: 'The specified accountability partner was not found or you do not have permission to update it.',
+            statusCode: 404,
+          };
+          return reply.status(404).send(response);
+        }
+
+        // Update the phone number
+        await partner.update({ phoneNumber: phoneNumber.trim() || null });
+
+        const response: IAPIResponse = {
+          success: true,
+          message: 'Partner phone number updated successfully',
+          data: {
+            id: partner.id,
+            phoneNumber: partner.phoneNumber,
+          },
+          statusCode: 200,
+        };
+        reply.status(200).send(response);
+      } catch (error: any) {
+        const response: IAPIResponse = {
+          success: false,
+          message: 'Failed to update partner phone number',
+          error: error.message,
+          statusCode: 500,
+        };
+        reply.status(500).send(response);
+      }
+    }
+  );
 }

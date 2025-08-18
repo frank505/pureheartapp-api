@@ -345,4 +345,5 @@ export interface IMatchInstallRequest {
 export interface IInviteUser {
   emails: string[];
   hash?: string;
+  phoneNumber?: string;
 }
