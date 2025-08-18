@@ -32,6 +32,7 @@ import { generateUniqueHash } from '../utils/hash';
 import { EmailQueueService } from '../jobs/emailJobs';
 // Import models through the index to ensure associations are initialized
 import { User, OnboardingData, AccountabilityPartner, sequelize } from '../models';
+import { TruthLiesQueueService } from '../jobs/truthLiesJobs';
 import {
   authenticate,
   authRateLimit,
@@ -109,10 +110,19 @@ export default async function authRoutes(fastify: FastifyInstance) {
       }
 
       if (isRegistration && onboardingData) {
-        await OnboardingData.create({
-          userId: user.id,
-          ...onboardingData,
-        }, { transaction: t });
+       await Promise.all(
+          [
+            OnboardingData.create({
+              userId: user.id,
+              ...onboardingData,
+            }, { transaction: t }),
+            TruthLiesQueueService.addGenerateTruthLiesJob(user.id, onboardingData)
+          ]
+        );
+        
+      } else if (isRegistration) {
+        // Generate general truth/lies if no onboarding data
+        await TruthLiesQueueService.addGenerateTruthLiesJob(user.id);
       }
       if(init_sent_accountability_id || onboardingData.accountabilityPreferences?.invitationHash ){
         if(isRegistration){

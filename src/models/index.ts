@@ -25,6 +25,9 @@ import DailyRecommendation from './DailyRecommendation';
 import Achievement from './Achievement';
 import UserAchievement from './UserAchievement';
 import UserProgress from './UserProgress';
+import TruthLies from './TruthLies';
+import AIChatSession from './AIChatSession';
+import AIChatMessage from './AIChatMessage';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -134,8 +137,22 @@ Group.belongsToMany(PrayerRequest, {
   as: 'prayerRequests',
 });
 
+// Accountability comments associations
+// A user can write many accountability comments
+User.hasMany(AccountabilityComment, {
+  foreignKey: 'userId',
+  as: 'comments',
+});
+
+// Each accountability comment belongs to a single user (author)
+AccountabilityComment.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
 // Export all models
 export {
+  sequelize,
   User,
   OnboardingData,
   AccountabilityPartner,
@@ -157,7 +174,9 @@ export {
   Achievement,
   UserAchievement,
   UserProgress,
-  sequelize,
+  TruthLies,
+  AIChatSession,
+  AIChatMessage,
 };
 
 // Export a function to sync all models

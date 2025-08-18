@@ -31,6 +31,7 @@ class User extends Model<IUser, UserCreationAttributes> implements IUser {
   public passwordResetExpires?: Date | null;
   public emailVerificationToken?: string | null;
   public emailVerificationExpires?: Date | null;
+  public timezone?: string | null;
 
   // Timestamps (automatically managed by Sequelize)
   public readonly createdAt!: Date;
@@ -407,6 +408,11 @@ User.init(
     // Email verification token expiration
     emailVerificationExpires: {
       type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    timezone: {
+      type: DataTypes.STRING(100),
       allowNull: true,
     },
 

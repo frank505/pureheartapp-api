@@ -28,6 +28,7 @@ export const queueConnection: ConnectionOptions = {
 export const QUEUE_NAMES = {
   EMAIL: 'email-queue',
   NOTIFICATIONS: 'notifications-queue',
+  TRUTH_LIES: 'truth-lies-queue',
   USER_CLEANUP: 'user-cleanup-queue',
   ANALYTICS: 'analytics-queue',
 } as const;
@@ -36,6 +37,10 @@ export const QUEUE_NAMES = {
  * Job types for different queues
  */
 export const JOB_TYPES = {
+  TRUTH_LIES: {
+    GENERATE_PERSONALIZED: 'generate-personalized-truth-lies',
+    UPDATE_COMMON_LIES: 'update-common-lies',
+  },
   EMAIL: {
     WELCOME: 'send-welcome-email',
     PASSWORD_RESET: 'send-password-reset-email',
@@ -99,6 +104,17 @@ export const DEFAULT_JOB_OPTIONS = {
     removeOnFail: { count: 50 },
     delay: 1000,
   },
+  
+  // Truth/Lies jobs - high priority, immediate processing
+  truthLies: {
+    attempts: 3,
+    backoff: {
+      type: 'exponential' as const,
+      delay: 2000,
+    },
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 50 },
+  },
 };
 
 /**
@@ -136,11 +152,18 @@ class QueueManager {
       defaultJobOptions: DEFAULT_JOB_OPTIONS.analytics,
     });
 
+    // Create truth/lies queue
+    const truthLiesQueue = new Queue(QUEUE_NAMES.TRUTH_LIES, {
+      connection: queueConnection,
+      defaultJobOptions: DEFAULT_JOB_OPTIONS.truthLies,
+    });
+
     // Store queues in map
     this.queues.set(QUEUE_NAMES.EMAIL, emailQueue);
     this.queues.set(QUEUE_NAMES.NOTIFICATIONS, notificationsQueue);
     this.queues.set(QUEUE_NAMES.USER_CLEANUP, userCleanupQueue);
     this.queues.set(QUEUE_NAMES.ANALYTICS, analyticsQueue);
+    this.queues.set(QUEUE_NAMES.TRUTH_LIES, truthLiesQueue);
 
     console.log('✅ All queues initialized successfully');
   }
@@ -192,6 +215,17 @@ class QueueManager {
     const queue = this.queues.get(QUEUE_NAMES.ANALYTICS);
     if (!queue) {
       throw new Error('Analytics queue not initialized');
+    }
+    return queue;
+  }
+
+  /**
+   * Get the truth/lies queue
+   */
+  public getTruthLiesQueue(): Queue {
+    const queue = this.queues.get(QUEUE_NAMES.TRUTH_LIES);
+    if (!queue) {
+      throw new Error('Truth/Lies queue not initialized');
     }
     return queue;
   }

@@ -103,7 +103,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     '/invites/send-by-email',
     { preHandler: [authenticate] },
     async (request, reply) => {
-      const { emails, hash } = request.body;
+      const { emails, hash, phoneNumber } = request.body;
       const { userId } = request as AuthenticatedFastifyRequest;
 
       if (!emails || !Array.isArray(emails) || emails.length === 0) {
@@ -127,6 +127,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
             const invitation = await AccountabilityPartner.create({
               userId,
               hash: invitationHash,
+              phoneNumber: phoneNumber || null,
             });
             await emailService.sendAccountabilityInviteEmail(
               email,
@@ -268,6 +269,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         return {
           id: invitation.id,
           since: invitation.usedAt ?? invitation.createdAt,
+          phoneNumber: invitation.phoneNumber,
           partner,
         };
       });
@@ -276,6 +278,61 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     } catch (error) {
       request.log.error('Error fetching partners:', error);
       return reply.status(500).send({ items: [] });
+    }
+  });
+
+  // Get phone numbers of all partners the authenticated user is accountable to
+  fastify.get('/partners/phones', { preHandler: [authenticate] }, async (request, reply) => {
+    const { userId } = request as AuthenticatedFastifyRequest;
+
+    try {
+      const acceptedInvites = await AccountabilityPartner.findAll({
+        where: {
+          usedAt: { [Op.not]: null },
+          [Op.or]: [{ userId }, { receiverId: userId }],
+          phoneNumber: { [Op.not]: null }, // Only get partnerships with phone numbers
+        },
+        attributes: ['id', 'phoneNumber', 'userId', 'receiverId', 'usedAt'],
+        include: [
+          { model: User, as: 'sender', attributes: ['id', 'email', 'firstName', 'lastName'] },
+          { model: User, as: 'receiver', attributes: ['id', 'email', 'firstName', 'lastName'] },
+        ],
+        order: [['usedAt', 'DESC']],
+      });
+
+      const phoneNumbers = acceptedInvites
+        .map((invitation) => {
+          const json = (invitation.toJSON ? invitation.toJSON() : (invitation as any)) as any;
+          const partnerUser = json.sender && json.sender.id === userId ? json.receiver : json.sender;
+          const name = partnerUser
+            ? [partnerUser.firstName, partnerUser.lastName].filter(Boolean).join(' ').trim()
+            : null;
+          return {
+            partnerId: invitation.id,
+            phoneNumber: invitation.phoneNumber,
+            name,
+            email: partnerUser ? partnerUser.email : null,
+          };
+        })
+        .filter(item => !!item.phoneNumber); // Extra filter to ensure no null values
+
+      return reply.send({ 
+        success: true,
+        message: 'Partner phone numbers retrieved successfully',
+        data: {
+          phoneNumbers,
+          count: phoneNumbers.length
+        },
+        statusCode: 200
+      });
+    } catch (error) {
+      request.log.error('Error fetching partner phone numbers:', error);
+      return reply.status(500).send({ 
+        success: false,
+        message: 'Failed to retrieve partner phone numbers',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: 500
+      });
     }
   });
 
@@ -304,8 +361,8 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
   });
 
   // Save an invitation hash for the authenticated user (create pending invitation)
-  fastify.post<{ Body: { hash: string } }>('/invites/invitations', { preHandler: [authenticate] }, async (request, reply) => {
-    const { hash } = request.body || ({} as any);
+  fastify.post<{ Body: { hash: string; phoneNumber?: string } }>('/invites/invitations', { preHandler: [authenticate] }, async (request, reply) => {
+    const { hash, phoneNumber } = request.body || ({} as any);
     const { userId } = request as AuthenticatedFastifyRequest;
 
     if (!hash || typeof hash !== 'string' || hash.trim().length === 0) {
@@ -316,13 +373,17 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       const existing = await AccountabilityPartner.findOne({ where: { hash } });
       if (existing) {
         if (existing.userId === userId && !existing.usedAt && !existing.receiverId) {
-          return reply.status(200).send({ id: existing.id, hash: existing.hash });
+          return reply.status(200).send({ id: existing.id, hash: existing.hash, phoneNumber: existing.phoneNumber });
         }
         return reply.status(409).send({ success: false, message: 'Invitation hash already in use' });
       }
 
-      const created = await AccountabilityPartner.create({ userId, hash });
-      return reply.status(201).send({ id: created.id, hash: created.hash });
+      const created = await AccountabilityPartner.create({ 
+        userId, 
+        hash,
+        phoneNumber: phoneNumber || null 
+      });
+      return reply.status(201).send({ id: created.id, hash: created.hash, phoneNumber: created.phoneNumber });
     } catch (error) {
       request.log.error('Error saving invitation hash:', error);
       return reply.status(500).send({ success: false, message: 'Failed to save invitation hash' });

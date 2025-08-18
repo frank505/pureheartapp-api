@@ -1,5 +1,6 @@
 import { Op } from 'sequelize';
 import AccountabilityCheckIn from '../models/AccountabilityCheckIn';
+import type { CheckInStatus } from '../models/AccountabilityCheckIn';
 import PrayerRequest from '../models/PrayerRequest';
 import Victory from '../models/Victory';
 import AccountabilityComment from '../models/AccountabilityComment';
@@ -22,25 +23,54 @@ export const ensureUserProgress = async (userId: number): Promise<UserProgress> 
   return UserProgress.create({ userId });
 };
 
-export const recordCheckInAndUpdateStreak = async (userId: number, createdAt: Date): Promise<UserProgress> => {
+export const recordCheckInAndUpdateStreak = async (userId: number, createdAt: Date, status: CheckInStatus = 'victory'): Promise<UserProgress> => {
   const progress = await ensureUserProgress(userId);
   const last = progress.lastCheckInDate ? new Date(progress.lastCheckInDate) : null;
   const createdDate = new Date(createdAt);
   const createdDay = new Date(Date.UTC(createdDate.getUTCFullYear(), createdDate.getUTCMonth(), createdDate.getUTCDate()));
-  let current = 1;
+  // Always increment total check-ins
+  progress.checkInCount += 1;
+
+  // If this check-in is marked as a relapse, reset current streak and store relapse date
+  if (status === 'relapse') {
+    progress.currentCheckInStreak = 0;
+    progress.lastRelapseDate = createdDay;
+    progress.lastCheckInDate = createdDay;
+    await progress.save();
+    return progress;
+  }
+
+  // For victory check-ins, continue the streak logic based on consecutive days
+  let current = progress.currentCheckInStreak > 0 ? progress.currentCheckInStreak : 0;
   if (last) {
     const lastDay = new Date(Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate()));
     const diffDays = Math.floor((createdDay.getTime() - lastDay.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) {
-      current = progress.currentCheckInStreak; // same day, don't increment streak by day
+      // same day, don't increment streak by day
     } else if (diffDays === 1) {
-      current = progress.currentCheckInStreak + 1;
+      current = current + 1;
     } else if (diffDays > 1) {
+      // gap detected, streak restarts from 1 (today)
+      current = 1;
+    }
+  } else {
+    current = 1; // first ever check-in and it's a victory
+  }
+
+  // If there was a relapse after the last check-in and before today, ensure streak counted since last relapse
+  if (progress.lastRelapseDate) {
+    const rel = new Date(progress.lastRelapseDate);
+    const relDay = new Date(Date.UTC(rel.getUTCFullYear(), rel.getUTCMonth(), rel.getUTCDate()));
+    if (relDay.getTime() === createdDay.getTime()) {
+      // same-day victory after relapse still results in 0 current streak; but we already returned above for relapse
+      current = 0;
+    } else if (last && relDay.getTime() > last.getTime()) {
+      // relapse occurred after the last check-in; this victory starts a new streak today
       current = 1;
     }
   }
+
   const longest = Math.max(progress.longestCheckInStreak, current);
-  progress.checkInCount += 1;
   progress.currentCheckInStreak = current;
   progress.longestCheckInStreak = longest;
   progress.lastCheckInDate = createdDay;

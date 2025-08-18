@@ -24,11 +24,16 @@ import notificationsRoutes from './routes/notifications';
 import accountabilityRoutes from './routes/accountability';
 import recommendationsRoutes from './routes/recommendations';
 import { initializeRecommendationWorker, scheduleDailyRecommendations } from './jobs/recommendationJobs';
+import { initializeTruthLiesWorker, closeTruthLiesWorker } from './jobs/truthLiesJobs';
 import progressRoutes from './routes/progress';
+import truthLiesRoutes from './routes/truthLies';
 import { initializeDefaultAchievements } from './config/achievements';
+import aiChatRoutes from './routes/aichat';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
+import './models/AIChatSession';
+import './models/AIChatMessage';
 
 /**
  * Create and configure Fastify server instance
@@ -101,6 +106,9 @@ const createServer = async (): Promise<FastifyInstance> => {
   // Initialize recommendation worker and scheduler
   initializeRecommendationWorker();
   scheduleDailyRecommendations();
+
+  // Initialize truth/lies worker
+  initializeTruthLiesWorker();
 
   // Set up Bull Dashboard for queue monitoring
   const serverAdapter = new FastifyAdapter();
@@ -273,6 +281,8 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(accountabilityRoutes, { prefix: '/api/accountability' });
   await fastify.register(recommendationsRoutes, { prefix: '/api' });
   await fastify.register(progressRoutes, { prefix: '/api' });
+  await fastify.register(truthLiesRoutes, { prefix: '/api' });
+  await fastify.register(aiChatRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
@@ -284,6 +294,10 @@ const createServer = async (): Promise<FastifyInstance> => {
         // Close email worker
         await closeEmailWorker();
         fastify.log.info('Email worker closed');
+        
+        // Close truth/lies worker
+        await closeTruthLiesWorker();
+        fastify.log.info('Truth/Lies worker closed');
         
         // Close queue system
         await queueManager.closeAll();

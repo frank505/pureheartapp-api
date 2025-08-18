@@ -13,6 +13,7 @@ export interface IUser {
   passwordResetExpires?: Date | null;
   emailVerificationToken?: string | null;
   emailVerificationExpires?: Date | null;
+  timezone?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;

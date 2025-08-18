@@ -17,7 +17,8 @@ export default async function recommendationsRoutes(fastify: FastifyInstance) {
 
     const rec = await DailyRecommendation.findOne({ where: { userId, localDate }, order: [['createdAt', 'DESC']] });
     if (!rec) return reply.status(404).send({ success: false, message: 'Recommendation not available yet', statusCode: 404 });
-
+     console.log({rec});
+  // No hydration here; job ensures data is complete
     return reply.send({
       success: true,
       message: 'OK',
@@ -28,6 +29,8 @@ export default async function recommendationsRoutes(fastify: FastifyInstance) {
         bibleVersion: rec.bibleVersion ?? undefined,
         scriptureReference: rec.scriptureReference ?? undefined,
         scriptureText: rec.scriptureText ?? undefined,
+  prayerFocus: rec.prayerFocus ?? undefined,
+  scripturesToPrayWith: rec.scripturesToPrayWith ?? undefined,
         youtube: rec.youtubeUrl ? {
           url: rec.youtubeUrl,
           videoId: rec.youtubeVideoId ?? undefined,
@@ -58,6 +61,8 @@ export default async function recommendationsRoutes(fastify: FastifyInstance) {
       localDate: rec.localDate,
       bibleVersion: rec.bibleVersion ?? undefined,
       scriptureReference: rec.scriptureReference ?? undefined,
+  prayerFocus: rec.prayerFocus ?? undefined,
+  scripturesToPrayWith: rec.scripturesToPrayWith ?? undefined,
       youtube: rec.youtubeUrl ? {
         url: rec.youtubeUrl,
         title: rec.youtubeTitle ?? undefined,
@@ -66,6 +71,41 @@ export default async function recommendationsRoutes(fastify: FastifyInstance) {
     }));
 
     return reply.send({ items, page: currentPage, totalPages: Math.ceil(count / pageSize) });
+  });
+
+  fastify.post('/recommendations/generate', { preHandler: [authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { userId } = request as AuthenticatedFastifyRequest;
+    const tz = (request.headers['x-user-timezone'] as string) || 'UTC';
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+    const parts = formatter.formatToParts(now);
+    const yyyy = parts.find(p => p.type === 'year')?.value || '1970';
+    const mm = parts.find(p => p.type === 'month')?.value || '01';
+    const dd = parts.find(p => p.type === 'day')?.value || '01';
+    const localDate = `${yyyy}-${mm}-${dd}`;
+  const { runGenerateDailyRecommendation } = await import('../jobs/recommendationJobs');
+  const rec = await runGenerateDailyRecommendation({ userId, localDate, timezone: tz });
+    return reply.status(200).send({
+      success: true,
+      message: 'Recommendation generated.',
+      statusCode: 200,
+      data: {
+        id: rec.id,
+        localDate: rec.localDate,
+        bibleVersion: rec.bibleVersion ?? undefined,
+        scriptureReference: rec.scriptureReference ?? undefined,
+        scriptureText: rec.scriptureText ?? undefined,
+        prayerFocus: rec.prayerFocus ?? undefined,
+    scripturesToPrayWith: rec.scripturesToPrayWith ?? undefined,
+        youtube: rec.youtubeUrl ? {
+          url: rec.youtubeUrl,
+          videoId: rec.youtubeVideoId ?? undefined,
+          title: rec.youtubeTitle ?? undefined,
+          channelId: rec.youtubeChannelId ?? undefined,
+          channelTitle: rec.youtubeChannelTitle ?? undefined,
+        } : undefined,
+      }
+    });
   });
 }
 
