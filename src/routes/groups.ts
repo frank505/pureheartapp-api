@@ -31,7 +31,20 @@ export default async function groupRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ success: false, message: 'Missing required fields', statusCode: 400 });
     }
 
-    const created = await Group.create({ name, description: description || null, privacy, ownerId: userId, inviteCode: inviteCode || null });
+    // Feature gates for public groups
+    if (privacy === 'public') {
+      const { requireFeatureUnlocked, countUserPublicGroupsOwned } = await import('../services/featureService');
+      await requireFeatureUnlocked(userId, 'group_public_create');
+      const count = await countUserPublicGroupsOwned(userId);
+      if (count >= 1) {
+        await requireFeatureUnlocked(userId, 'create_multiple_public_groups');
+      }
+    }
+
+    try {
+  const created = await Group.create({ name, description: description || null, privacy, ownerId: userId, inviteCode: inviteCode || null });
+  // Award badges for group creation
+  (await import('../services/badgeService')).awardForGroupCreation(userId).catch(() => {});
     // Add owner as member
     await GroupMember.create({ groupId: created.id, userId, role: 'owner' });
 
@@ -65,7 +78,12 @@ export default async function groupRoutes(fastify: FastifyInstance) {
       updatedAt: created.updatedAt.toISOString(),
     };
 
-    return reply.status(201).send(response);
+      return reply.status(201).send(response);
+    } catch (err: any) {
+      const status = err?.statusCode === 403 ? 403 : 500;
+      const msg = err?.code === 'FEATURE_LOCKED' ? err.message : 'Failed to create group';
+      return reply.status(status).send({ success: false, message: msg, error: err?.message, statusCode: status } satisfies IAPIResponse);
+    }
   });
 
   // Public discovery list

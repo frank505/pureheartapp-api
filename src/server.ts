@@ -28,12 +28,16 @@ import { initializeTruthLiesWorker, closeTruthLiesWorker } from './jobs/truthLie
 import progressRoutes from './routes/progress';
 import truthLiesRoutes from './routes/truthLies';
 import { initializeDefaultAchievements } from './config/achievements';
+import { initializeDefaultBadges } from './config/badges';
 import aiChatRoutes from './routes/aichat';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
 import './models/AIChatSession';
 import './models/AIChatMessage';
+import './models/Badge';
+import './models/UserBadge';
+import './models/index';
 
 /**
  * Create and configure Fastify server instance
@@ -348,6 +352,8 @@ const startServer = async (): Promise<void> => {
     await initializeGeneralSettings();
     // Seed default achievements
     await initializeDefaultAchievements();
+  // Seed default badges
+  await initializeDefaultBadges();
     
     // Create and start the server
     const fastify = await createServer();

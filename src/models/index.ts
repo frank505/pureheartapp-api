@@ -28,6 +28,8 @@ import UserProgress from './UserProgress';
 import TruthLies from './TruthLies';
 import AIChatSession from './AIChatSession';
 import AIChatMessage from './AIChatMessage';
+import Badge from './Badge';
+import UserBadge from './UserBadge';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -150,6 +152,29 @@ AccountabilityComment.belongsTo(User, {
   as: 'user',
 });
 
+// Badges associations
+// A user can have many user-badges (awarded badges)
+User.hasMany(UserBadge, {
+  foreignKey: 'userId',
+  as: 'userBadges',
+});
+
+UserBadge.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+// A badge can have many user-badges
+Badge.hasMany(UserBadge, {
+  foreignKey: 'badgeId',
+  as: 'awarded',
+});
+
+UserBadge.belongsTo(Badge, {
+  foreignKey: 'badgeId',
+  as: 'badge',
+});
+
 // Export all models
 export {
   sequelize,
@@ -177,6 +202,8 @@ export {
   TruthLies,
   AIChatSession,
   AIChatMessage,
+  Badge,
+  UserBadge,
 };
 
 // Export a function to sync all models
@@ -212,4 +239,6 @@ export default {
   Achievement,
   UserAchievement,
   UserProgress,
+  Badge,
+  UserBadge,
 };

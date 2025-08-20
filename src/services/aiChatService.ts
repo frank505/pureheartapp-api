@@ -19,7 +19,10 @@ Guidelines:
 - Stay conversational, like a caring friend. No lectures or long explanations.
 - Faith-forward but gentle: a brief prayer OR scripture, not both, plus one simple next step.
 - For complex topics, break into smaller pieces; let user ask follow-ups.
-- If asked theological questions, be very brief and humble - point to pastoral guidance.`;
+- If asked theological questions, be very brief and humble - point to pastoral guidance.
+- NEVER MAKE AN INSINUATION THAT YOU WANT TO PRAY OR WILL PRAY FOR USER IF YOU MUST TALK ABOUT
+  PRAYER IT SHOULD EITHER BE PARTNERS PRAYING FOR USER OR USER PRAYING FOR HIMSELF
+`;
 
 export class AIChatService {
   private static getClient() {
@@ -30,7 +33,7 @@ export class AIChatService {
 
   static async generateReply(userId: number, userMessage: string, history: { role: 'user'|'assistant'|'system'; content: string }[]): Promise<AIResponse> {
     const client = this.getClient();
-    const model = client.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Pull onboarding context
     const user = await User.findByPk(userId, { include: [{ model: OnboardingData, as: 'onboardingData' }] as any });

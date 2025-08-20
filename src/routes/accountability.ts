@@ -424,8 +424,10 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         });
 
         // Update progress and evaluate achievements
-        await incrementCounter(userId, 'prayerCount');
-        const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
+  await incrementCounter(userId, 'prayerCount');
+  const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
+  // Award prayer-related badges
+  (await import('../services/badgeService')).awardForPrayerProgress(userId).catch(() => {});
 
         if (prayerRequest.visibility === 'group' && groupIds) {
           await (prayerRequest as any).addGroups(groupIds);
@@ -986,6 +988,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       try {
         const { title, body, visibility, partnerIds, groupIds } = request.body;
         const userId = (request as AuthenticatedFastifyRequest).userId;
+        const { requireFeatureUnlocked, hasFeatureUnlocked, countUserVictories } = await import('../services/featureService');
 
         if (!title) {
           const response: IAPIResponse = {
@@ -1017,6 +1020,15 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           return reply.status(400).send(response);
         }
 
+        // Feature locks
+        if (visibility === 'public') {
+          await requireFeatureUnlocked(userId, 'victory_public_post');
+        }
+        const victoriesSoFar = await countUserVictories(userId);
+        if (victoriesSoFar >= 1) {
+          await requireFeatureUnlocked(userId, 'post_more_than_one_victory');
+        }
+
         const victory = await Victory.create({
           userId,
           title,
@@ -1026,8 +1038,10 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         });
 
         // Update progress and evaluate achievements
-        await incrementCounter(userId, 'victoryCount');
-        const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
+  await incrementCounter(userId, 'victoryCount');
+  const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
+  // Award victory-related badges
+  (await import('../services/badgeService')).awardForVictoryProgress(userId).catch(() => {});
 
         if (victory.visibility === 'group' && groupIds) {
           await (victory as any).addGroups(groupIds);
@@ -1060,14 +1074,15 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         };
 
         reply.status(201).send(response);
-      } catch (error: any) {
+    } catch (error: any) {
+        const status = error?.statusCode === 403 ? 403 : 500;
         const response: IAPIResponse = {
           success: false,
-          message: 'Failed to create victory',
+          message: error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to create victory',
           error: error.message,
-          statusCode: 500,
+          statusCode: status,
         };
-        reply.status(500).send(response);
+        reply.status(status).send(response);
       }
     }
   );
@@ -1511,7 +1526,13 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       const updates: Partial<IVictory> = {};
       if (title) updates.title = title;
       if (body) updates.body = body;
-      if (visibility) updates.visibility = visibility;
+      if (visibility) {
+        if (visibility === 'public') {
+          const { requireFeatureUnlocked } = await import('../services/featureService');
+          await requireFeatureUnlocked((req as any).userId || (req as any).user.id, 'victory_public_post');
+        }
+        updates.visibility = visibility;
+      }
       if (partnerIds) updates.partnerIds = partnerIds;
       if (groupIds) updates.groupIds = groupIds;
 
@@ -1637,7 +1658,9 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           attachments: attachments ?? null,
         });
 
-        const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
+  const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
+  // Award comment-related badges
+  (await import('../services/badgeService')).awardForCommentProgress(userId).catch(() => {});
 
         if (checkIn.userId !== userId) {
           await PushQueue.sendNotification({
@@ -1711,7 +1734,8 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           attachments: attachments ?? null,
         });
 
-        const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
+  const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
+  (await import('../services/badgeService')).awardForCommentProgress(userId).catch(() => {});
 
         if (prayerRequest.userId !== userId) {
           await PushQueue.sendNotification({
@@ -1785,7 +1809,8 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           attachments: attachments ?? null,
         });
 
-        const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
+  const newlyUnlocked = await incrementCounter(userId, 'commentCount').then(() => evaluateAndUnlockAchievements(userId));
+  (await import('../services/badgeService')).awardForCommentProgress(userId).catch(() => {});
 
         if (victory.userId !== userId) {
           await PushQueue.sendNotification({
