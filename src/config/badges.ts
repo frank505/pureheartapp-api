@@ -20,7 +20,7 @@ export const DEFAULT_BADGES = [
     code: 'badge_first_prayer',
     title: 'First Prayer',
     description: 'Posted your first prayer request.',
-  icon: 'https://api.iconify.design/mdi/hand-prayer.svg',
+  icon: 'https://api.iconify.design/ph/hands-praying.svg',
     tier: 'bronze',
   },
   {

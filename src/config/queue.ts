@@ -31,6 +31,7 @@ export const QUEUE_NAMES = {
   TRUTH_LIES: 'truth-lies-queue',
   USER_CLEANUP: 'user-cleanup-queue',
   ANALYTICS: 'analytics-queue',
+  FASTING: 'fasting-queue',
 } as const;
 
 /**
@@ -40,6 +41,9 @@ export const JOB_TYPES = {
   TRUTH_LIES: {
     GENERATE_PERSONALIZED: 'generate-personalized-truth-lies',
     UPDATE_COMMON_LIES: 'update-common-lies',
+  },
+  FASTING: {
+    SEND_PRAYER_REMINDER: 'fasting-send-prayer-reminder',
   },
   EMAIL: {
     WELCOME: 'send-welcome-email',
@@ -104,6 +108,16 @@ export const DEFAULT_JOB_OPTIONS = {
     removeOnFail: { count: 50 },
     delay: 1000,
   },
+  // Fasting jobs - medium priority, frequent small jobs
+  fasting: {
+    attempts: 2,
+    backoff: {
+      type: 'exponential' as const,
+      delay: 1000,
+    },
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 50 },
+  },
   
   // Truth/Lies jobs - high priority, immediate processing
   truthLies: {
@@ -158,12 +172,19 @@ class QueueManager {
       defaultJobOptions: DEFAULT_JOB_OPTIONS.truthLies,
     });
 
+    // Create fasting queue
+    const fastingQueue = new Queue(QUEUE_NAMES.FASTING, {
+      connection: queueConnection,
+      defaultJobOptions: DEFAULT_JOB_OPTIONS.fasting,
+    });
+
     // Store queues in map
     this.queues.set(QUEUE_NAMES.EMAIL, emailQueue);
     this.queues.set(QUEUE_NAMES.NOTIFICATIONS, notificationsQueue);
     this.queues.set(QUEUE_NAMES.USER_CLEANUP, userCleanupQueue);
     this.queues.set(QUEUE_NAMES.ANALYTICS, analyticsQueue);
     this.queues.set(QUEUE_NAMES.TRUTH_LIES, truthLiesQueue);
+  this.queues.set(QUEUE_NAMES.FASTING, fastingQueue);
 
     console.log('✅ All queues initialized successfully');
   }
@@ -226,6 +247,17 @@ class QueueManager {
     const queue = this.queues.get(QUEUE_NAMES.TRUTH_LIES);
     if (!queue) {
       throw new Error('Truth/Lies queue not initialized');
+    }
+    return queue;
+  }
+
+  /**
+   * Get the fasting queue
+   */
+  public getFastingQueue(): Queue {
+    const queue = this.queues.get(QUEUE_NAMES.FASTING);
+    if (!queue) {
+      throw new Error('Fasting queue not initialized');
     }
     return queue;
   }

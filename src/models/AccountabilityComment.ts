@@ -1,7 +1,7 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-export type CommentTargetType = 'checkin' | 'prayer_request' | 'victory';
+export type CommentTargetType = 'checkin' | 'prayer_request' | 'victory' | 'fast_journal';
 
 export interface IAccountabilityComment {
   id: number; // uuid
@@ -41,7 +41,7 @@ AccountabilityComment.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
     userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' } },
-    targetType: { type: DataTypes.ENUM('checkin', 'prayer_request', 'victory'), allowNull: false },
+  targetType: { type: DataTypes.ENUM('checkin', 'prayer_request', 'victory', 'fast_journal'), allowNull: false },
     targetId: { type: DataTypes.INTEGER, allowNull: false },
     body: { type: DataTypes.TEXT, allowNull: false },
     mentions: { type: DataTypes.JSON, allowNull: true },
