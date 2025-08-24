@@ -28,12 +28,28 @@ import { initializeTruthLiesWorker, closeTruthLiesWorker } from './jobs/truthLie
 import progressRoutes from './routes/progress';
 import truthLiesRoutes from './routes/truthLies';
 import { initializeDefaultAchievements } from './config/achievements';
+import { initializeDefaultBadges } from './config/badges';
 import aiChatRoutes from './routes/aichat';
+import breatheRoutes from './routes/breathe';
+import fastRoutes from './routes/fasts';
+import widgetRoutes from './routes/widget';
+import { scheduleFastingCron, initializeFastingWorker } from './jobs/fastingJobs';
+import devicesRoutes from './routes/devices';
+import { initFirebaseIfNeeded } from './services/pushService';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
 import './models/AIChatSession';
 import './models/AIChatMessage';
+import './models/Badge';
+import './models/UserBadge';
+import './models/index';
+import './models/Fast';
+import './models/FastPrayerLog';
+import './models/FastProgressLog';
+import './models/FastReminderLog';
+import './models/FastJournal';
+import './models/FastMessage';
 
 /**
  * Create and configure Fastify server instance
@@ -93,22 +109,35 @@ const createServer = async (): Promise<FastifyInstance> => {
     prefix: '/public/',
   });
 
+  // Serve 1-minute ASMR clips
+  await fastify.register(fastifyStatic, {
+    root: path.join(__dirname, '..', 'src', '1min_clips'),
+    prefix: '/audio/1min/',
+    decorateReply: false,
+    serve: true,
+  } as any);
+
   // Add Redis utilities to Fastify instance
   fastify.decorate('redisUtils', new RedisUtils(fastify.redis));
 
   // Initialize queue system
   initializeQueueSystem();
   
-  // Initialize email worker
-  initializeEmailWorker();
-  // Initialize notification worker
-  initializeNotificationWorker();
-  // Initialize recommendation worker and scheduler
-  initializeRecommendationWorker();
-  scheduleDailyRecommendations();
+  // Initialize all workers concurrently
+  await Promise.allSettled([
+    Promise.resolve().then(() => initializeEmailWorker()),
+    Promise.resolve().then(() => initializeNotificationWorker()),
+    Promise.resolve().then(() => initializeRecommendationWorker()),
+    Promise.resolve().then(() => initializeTruthLiesWorker()),
+    Promise.resolve().then(() => initFirebaseIfNeeded()),
+    Promise.resolve().then(() => initializeFastingWorker()),
+  ]);
 
-  // Initialize truth/lies worker
-  initializeTruthLiesWorker();
+  // Schedule recurring jobs in parallel
+  await Promise.allSettled([
+    Promise.resolve().then(() => scheduleDailyRecommendations()),
+    Promise.resolve().then(() => scheduleFastingCron()),
+  ]);
 
   // Set up Bull Dashboard for queue monitoring
   const serverAdapter = new FastifyAdapter();
@@ -283,6 +312,10 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(progressRoutes, { prefix: '/api' });
   await fastify.register(truthLiesRoutes, { prefix: '/api' });
   await fastify.register(aiChatRoutes, { prefix: '/api' });
+  await fastify.register(breatheRoutes, { prefix: '/api' });
+  await fastify.register(fastRoutes, { prefix: '/api' });
+  await fastify.register(widgetRoutes, { prefix: '/api' });
+  await fastify.register(devicesRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
@@ -348,6 +381,8 @@ const startServer = async (): Promise<void> => {
     await initializeGeneralSettings();
     // Seed default achievements
     await initializeDefaultAchievements();
+  // Seed default badges
+  await initializeDefaultBadges();
     
     // Create and start the server
     const fastify = await createServer();

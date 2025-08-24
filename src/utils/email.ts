@@ -33,6 +33,33 @@ export class EmailService implements IEmailService {
     this.transporter = createTransporter();
   }
 
+  async sendFastStartedEmail(email: string, partnerName: string, fasterName: string): Promise<boolean> {
+    try {
+      const subject = `${appConfig.name} - ${fasterName} just started a fast`;
+      const html = `
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${subject}</title></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; background: #f7f7f7; padding: 20px;">
+          <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;padding:20px;">
+            <h2 style="margin-top:0;">${appConfig.name}</h2>
+            <p>Hi ${partnerName},</p>
+            <p><strong>${fasterName}</strong> just started a fast and has invited you to keep them accountable. Please keep them in prayer and send encouragement.</p>
+            <p>Open the app to check in on them and offer support.</p>
+            <p style="color:#666">Blessings,<br/>The ${appConfig.name} Team</p>
+          </div>
+        </body></html>
+      `;
+      const text = `${fasterName} just started a fast and invited you to keep them accountable. Please keep them in prayer and send encouragement.\n\n- ${appConfig.name}`;
+      const mailOptions = { from: emailConfig.from, to: email, subject, html, text } as any;
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('Fast started email sent:', result.messageId);
+      return true;
+    } catch (error) {
+      console.error('Error sending fast started email:', error);
+      return false;
+    }
+  }
+
   async sendAccountabilityInviteEmail(
     email: string,
     inviterName: string,

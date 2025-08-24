@@ -2,6 +2,7 @@ import { Worker, JobsOptions } from 'bullmq';
 import { JOB_TYPES, QUEUE_NAMES, queueConnection, queueManager, DEFAULT_JOB_OPTIONS } from '../config/queue';
 import Notification from '../models/Notification';
 import { GroupMember } from '../models';
+import { sendPushToUser } from '../services/pushService';
 
 export interface PushPayload {
   type:
@@ -71,6 +72,7 @@ export const initializeNotificationWorker = (): void => {
             body: payload.body || null,
             data: payload.data || null,
           });
+          await sendPushToUser(payload.targetUserId, { title: payload.title || 'Notification', body: payload.body || undefined, data: (payload.data || {}) as any });
         } else if (payload.type === 'generic' && payload.targetUserId) {
           await Notification.create({
             userId: payload.targetUserId,
@@ -79,6 +81,7 @@ export const initializeNotificationWorker = (): void => {
             body: payload.body || null,
             data: payload.data || null,
           });
+          await sendPushToUser(payload.targetUserId, { title: payload.title || 'Notification', body: payload.body || undefined, data: (payload.data || {}) as any });
         }
         return true;
       }

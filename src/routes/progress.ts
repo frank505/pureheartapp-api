@@ -5,6 +5,8 @@ import AccountabilityCheckIn, { CheckInVisibility } from '../models/Accountabili
 import type { CheckInStatus } from '../models/AccountabilityCheckIn';
 import { Op } from 'sequelize';
 import { getAnalytics, getCalendarForMonth, getAchievementsForUser, evaluateAndUnlockAchievements, recordCheckInAndUpdateStreak } from '../services/progressService';
+import UserBadge from '../models/UserBadge';
+import Badge from '../models/Badge';
 import { PushQueue } from '../jobs/notificationJobs';
 
 export default async function (fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -119,6 +121,111 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       return reply.status(200).send({ success: true, message: 'Achievements retrieved', data: { items }, statusCode: 200 } satisfies IAPIResponse);
     } catch (error: any) {
       return reply.status(500).send({ success: false, message: 'Failed to get achievements', error: error.message, statusCode: 500 } satisfies IAPIResponse);
+    }
+  });
+
+  // GET /progress/badges
+  fastify.get('/progress/badges', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const userId = (request as AuthenticatedFastifyRequest).userId;
+      const items = await UserBadge.findAll({
+        where: { userId },
+        include: [{ model: Badge, as: 'badge' }],
+        order: [['unlockedAt', 'ASC']],
+      });
+      return reply.status(200).send({ success: true, message: 'Badges retrieved', data: { items }, statusCode: 200 } satisfies IAPIResponse);
+    } catch (error: any) {
+      return reply.status(500).send({ success: false, message: 'Failed to get badges', error: error.message, statusCode: 500 } satisfies IAPIResponse);
+    }
+  });
+
+  // GET /progress/features-and-badges
+  fastify.get('/progress/features-and-badges', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const userId = (request as AuthenticatedFastifyRequest).userId;
+      const { hasFeatureUnlocked, getFeatureThreshold } = await import('../services/featureService');
+      const { ensureUserProgress } = await import('../services/progressService');
+      const progress = await ensureUserProgress(userId);
+
+      type FeatureKey = import('../services/featureService').FeatureKey;
+      const FEATURE_KEYS: FeatureKey[] = [
+        'victory_public_post',
+        'group_public_create',
+        'multiple_accountability_partners',
+        'create_multiple_public_groups',
+        'post_more_than_one_victory',
+      ];
+
+      const features = await Promise.all(
+        FEATURE_KEYS.map(async (key) => {
+          const threshold = getFeatureThreshold(key);
+          const unlocked = await hasFeatureUnlocked(userId, key);
+          const current = progress.currentCheckInStreak || 0;
+          const longest = progress.longestCheckInStreak || 0;
+          const remainingDays = Math.max(0, threshold - current);
+          return {
+            key,
+            thresholdDays: threshold,
+            unlocked,
+            currentCheckInStreak: current,
+            longestCheckInStreak: longest,
+            remainingDays,
+          };
+        })
+      );
+
+      // Badges with status: all badges + unlocked flag and unlockedAt
+      const [allBadges, userBadges] = await Promise.all([
+        Badge.findAll(),
+        UserBadge.findAll({ where: { userId } }),
+      ]);
+      const awardedMap = new Map(userBadges.map((ub) => [ub.badgeId, ub]));
+      const badges = allBadges.map((b) => {
+        const awarded = awardedMap.get(b.id) || null;
+        return {
+          id: b.id,
+          code: (b as any).code,
+          title: (b as any).title,
+          description: (b as any).description,
+          icon: (b as any).icon,
+          tier: (b as any).tier,
+          unlocked: Boolean(awarded),
+          unlockedAt: awarded?.unlockedAt ?? null,
+        };
+      });
+
+      return reply.status(200).send({
+        success: true,
+        message: 'Features and badges',
+        data: { features, badges },
+        statusCode: 200,
+      } satisfies IAPIResponse);
+    } catch (error: any) {
+      return reply.status(500).send({ success: false, message: 'Failed to get features and badges', error: error.message, statusCode: 500 } satisfies IAPIResponse);
+    }
+  });
+
+  // GET /progress/features - returns boolean flags for feature unlocks
+  fastify.get('/progress/features', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const userId = (request as AuthenticatedFastifyRequest).userId;
+      const { hasFeatureUnlocked } = await import('../services/featureService');
+      const [victoryPublic, groupPublicCreate, multiPartners, multiPublicGroups, multiVictories] = await Promise.all([
+        hasFeatureUnlocked(userId, 'victory_public_post'),
+        hasFeatureUnlocked(userId, 'group_public_create'),
+        hasFeatureUnlocked(userId, 'multiple_accountability_partners'),
+        hasFeatureUnlocked(userId, 'create_multiple_public_groups'),
+        hasFeatureUnlocked(userId, 'post_more_than_one_victory'),
+      ]);
+      return reply.status(200).send({ success: true, message: 'Feature flags', data: {
+        victory_public_post: victoryPublic,
+        group_public_create: groupPublicCreate,
+        multiple_accountability_partners: multiPartners,
+        create_multiple_public_groups: multiPublicGroups,
+        post_more_than_one_victory: multiVictories,
+      }, statusCode: 200 } satisfies IAPIResponse);
+    } catch (error: any) {
+      return reply.status(500).send({ success: false, message: 'Failed to get features', error: error.message, statusCode: 500 } satisfies IAPIResponse);
     }
   });
 

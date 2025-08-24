@@ -28,6 +28,15 @@ import UserProgress from './UserProgress';
 import TruthLies from './TruthLies';
 import AIChatSession from './AIChatSession';
 import AIChatMessage from './AIChatMessage';
+import Badge from './Badge';
+import UserBadge from './UserBadge';
+import Fast from './Fast';
+import FastPrayerLog from './FastPrayerLog';
+import FastProgressLog from './FastProgressLog';
+import FastReminderLog from './FastReminderLog';
+import FastJournal from './FastJournal';
+import DeviceToken from './DeviceToken';
+import FastMessage from './FastMessage';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -49,6 +58,30 @@ DailyRecommendation.belongsTo(User, {
   foreignKey: 'userId',
   as: 'recommendedUser',
 });
+
+// Fast associations
+User.hasMany(Fast, { foreignKey: 'userId', as: 'fasts' });
+Fast.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Fast.hasMany(FastPrayerLog, { foreignKey: 'fastId', as: 'prayers' });
+Fast.hasMany(FastProgressLog, { foreignKey: 'fastId', as: 'progressLogs' });
+Fast.hasMany(FastJournal, { foreignKey: 'fastId', as: 'journals' });
+FastPrayerLog.belongsTo(Fast, { foreignKey: 'fastId', as: 'fast' });
+FastProgressLog.belongsTo(Fast, { foreignKey: 'fastId', as: 'fast' });
+FastJournal.belongsTo(Fast, { foreignKey: 'fastId', as: 'fast' });
+FastPrayerLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+FastProgressLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+FastJournal.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+// Fast messages associations
+Fast.hasMany(FastMessage, { foreignKey: 'fastId', as: 'messages' });
+FastMessage.belongsTo(Fast, { foreignKey: 'fastId', as: 'fast' });
+User.hasMany(FastMessage, { foreignKey: 'senderId', as: 'sentFastMessages' });
+User.hasMany(FastMessage, { foreignKey: 'recipientId', as: 'receivedFastMessages' });
+FastMessage.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
+FastMessage.belongsTo(User, { foreignKey: 'recipientId', as: 'recipient' });
+
+// Device tokens
+User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
+DeviceToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // A user can send many accountability invitations
 User.hasMany(AccountabilityPartner, {
@@ -150,6 +183,29 @@ AccountabilityComment.belongsTo(User, {
   as: 'user',
 });
 
+// Badges associations
+// A user can have many user-badges (awarded badges)
+User.hasMany(UserBadge, {
+  foreignKey: 'userId',
+  as: 'userBadges',
+});
+
+UserBadge.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+// A badge can have many user-badges
+Badge.hasMany(UserBadge, {
+  foreignKey: 'badgeId',
+  as: 'awarded',
+});
+
+UserBadge.belongsTo(Badge, {
+  foreignKey: 'badgeId',
+  as: 'badge',
+});
+
 // Export all models
 export {
   sequelize,
@@ -177,6 +233,15 @@ export {
   TruthLies,
   AIChatSession,
   AIChatMessage,
+  Badge,
+  UserBadge,
+  Fast,
+  FastPrayerLog,
+  FastProgressLog,
+  FastReminderLog,
+  FastJournal,
+  DeviceToken,
+  FastMessage,
 };
 
 // Export a function to sync all models
@@ -212,4 +277,12 @@ export default {
   Achievement,
   UserAchievement,
   UserProgress,
+  Badge,
+  UserBadge,
+  Fast,
+  FastPrayerLog,
+  FastProgressLog,
+  FastReminderLog,
+  DeviceToken,
+  FastMessage,
 };

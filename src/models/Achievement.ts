@@ -49,7 +49,8 @@ Achievement.init(
     code: { type: DataTypes.STRING(100), allowNull: false },
     title: { type: DataTypes.STRING(255), allowNull: false },
     description: { type: DataTypes.TEXT, allowNull: true },
-    category: { type: DataTypes.ENUM('streak', 'prayer', 'victory', 'comment', 'engagement'), allowNull: false },
+  // Use STRING instead of ENUM to avoid migration issues with existing data
+  category: { type: DataTypes.STRING(50), allowNull: false },
     tier: { type: DataTypes.ENUM('bronze', 'silver', 'gold', 'platinum'), allowNull: false, defaultValue: 'bronze' },
     requirement: { type: DataTypes.JSON, allowNull: false },
     points: { type: DataTypes.INTEGER, allowNull: true },

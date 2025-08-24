@@ -7,6 +7,8 @@ import AccountabilityComment from '../models/AccountabilityComment';
 import Achievement from '../models/Achievement';
 import UserAchievement from '../models/UserAchievement';
 import UserProgress from '../models/UserProgress';
+import Badge from '../models/Badge';
+import UserBadge from '../models/UserBadge';
 
 export interface AnalyticsSummary {
   checkIns: number;
@@ -94,51 +96,14 @@ export const evaluateAndUnlockAchievements = async (userId: number): Promise<Use
   const unlocked = await UserAchievement.findAll({ where: { userId } });
   const unlockedIds = new Set(unlocked.map((ua) => ua.achievementId));
   const newlyUnlocked: UserAchievement[] = [];
-
-  const valueForKey = (key: string): number => {
-    switch (key) {
-      case 'checkin_count':
-        return progress.checkInCount;
-      case 'prayer_count':
-        return progress.prayerCount;
-      case 'victory_count':
-        return progress.victoryCount;
-      case 'comment_count':
-        return progress.commentCount;
-      case 'checkin_streak_current':
-        return progress.currentCheckInStreak;
-      case 'checkin_streak_longest':
-        return progress.longestCheckInStreak;
-      default:
-        return 0;
-    }
-  };
+  const newlyAwardedBadges: UserBadge[] = [];
 
   const meetsRequirement = (req: any): boolean => {
     if (!req) return false;
-    switch (req.type) {
-      case 'checkin_streak':
-        return progress.longestCheckInStreak >= req.value || progress.currentCheckInStreak >= req.value;
-      case 'checkin_count':
-        return progress.checkInCount >= req.value;
-      case 'prayer_count':
-        return progress.prayerCount >= req.value;
-      case 'victory_count':
-        return progress.victoryCount >= req.value;
-      case 'comment_count':
-        return progress.commentCount >= req.value;
-      case 'composite': {
-        const rules: Array<{ k: string; v: number }> = req.rules ?? [];
-        return rules.length > 0 && rules.every((r) => valueForKey(r.k) >= r.v);
-      }
-      case 'composite_sum': {
-        const fields: string[] = req.fields ?? [];
-        const sum = fields.reduce((acc, f) => acc + valueForKey(f), 0);
-        return sum >= (req.value ?? 0);
-      }
-      default:
-        return false;
+    if (req.type === 'checkin_streak') {
+      return progress.currentCheckInStreak >= req.value || progress.longestCheckInStreak >= req.value;
     }
+    return false;
   };
 
   for (const a of all) {
@@ -159,6 +124,27 @@ export const evaluateAndUnlockAchievements = async (userId: number): Promise<Use
         },
       });
       newlyUnlocked.push(ua);
+
+      // Also award a corresponding badge for streak achievements
+      const code = (a as any).code as string;
+      const badgeCodeMap: Record<string, string> = {
+        streak_7: 'badge_streak_7',
+        streak_14: 'badge_streak_14',
+        streak_21: 'badge_streak_21',
+        streak_30: 'badge_streak_30',
+        streak_90: 'badge_streak_90',
+      };
+      const bCode = badgeCodeMap[code];
+      if (bCode) {
+        const badge = await Badge.findOne({ where: { code: bCode } });
+        if (badge) {
+          const [userBadge] = await UserBadge.findOrCreate({
+            where: { userId, badgeId: badge.id },
+            defaults: { userId, badgeId: badge.id, unlockedAt: new Date() },
+          });
+          newlyAwardedBadges.push(userBadge);
+        }
+      }
     }
   }
   return newlyUnlocked;
@@ -172,49 +158,12 @@ export const getAchievementsForUser = async (userId: number) => {
   const unlockedIds = new Set(unlocked.map((ua) => ua.achievementId));
   // Build a transient progress to compute canUnlock
   const progress = await ensureUserProgress(userId);
-  const valueForKey = (key: string): number => {
-    switch (key) {
-      case 'checkin_count':
-        return progress.checkInCount;
-      case 'prayer_count':
-        return progress.prayerCount;
-      case 'victory_count':
-        return progress.victoryCount;
-      case 'comment_count':
-        return progress.commentCount;
-      case 'checkin_streak_current':
-        return progress.currentCheckInStreak;
-      case 'checkin_streak_longest':
-        return progress.longestCheckInStreak;
-      default:
-        return 0;
-    }
-  };
   const meetsRequirement = (req: any): boolean => {
     if (!req) return false;
-    switch (req.type) {
-      case 'checkin_streak':
-        return progress.longestCheckInStreak >= req.value || progress.currentCheckInStreak >= req.value;
-      case 'checkin_count':
-        return progress.checkInCount >= req.value;
-      case 'prayer_count':
-        return progress.prayerCount >= req.value;
-      case 'victory_count':
-        return progress.victoryCount >= req.value;
-      case 'comment_count':
-        return progress.commentCount >= req.value;
-      case 'composite': {
-        const rules: Array<{ k: string; v: number }> = req.rules ?? [];
-        return rules.length > 0 && rules.every((r) => valueForKey(r.k) >= r.v);
-      }
-      case 'composite_sum': {
-        const fields: string[] = req.fields ?? [];
-        const sum = fields.reduce((acc, f) => acc + valueForKey(f), 0);
-        return sum >= (req.value ?? 0);
-      }
-      default:
-        return false;
+    if (req.type === 'checkin_streak') {
+      return progress.currentCheckInStreak >= req.value || progress.longestCheckInStreak >= req.value;
     }
+    return false;
   };
 
   return all.map((a) => ({

@@ -120,6 +120,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
             .send({ success: false, message: 'User not found' });
         }
 
+        // Enforce feature lock: multiple_accountability_partners if user already has one
+        const { countAcceptedPartners, requireFeatureUnlocked } = await import('../services/featureService');
+        const partnersCount = await countAcceptedPartners(userId);
+        if (partnersCount >= 1) {
+          await requireFeatureUnlocked(userId, 'multiple_accountability_partners');
+        }
+
         const emailService = new EmailService();
         const createdInvitations = await Promise.all(
           emails.map(async (email) => {
@@ -143,11 +150,11 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           message: 'Invitations sent successfully',
           invitations: createdInvitations,
         });
-      } catch (error) {
+      } catch (error: any) {
         request.log.error('Error sending invitations by email:', error);
-        return reply
-          .status(500)
-          .send({ success: false, message: 'Failed to send invitations' });
+        const status = (error?.statusCode === 403) ? 403 : 500;
+        const msg = error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to send invitations';
+        return reply.status(status).send({ success: false, message: msg });
       }
     }
   );
@@ -413,6 +420,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         return reply.status(409).send({ success: false, message: 'Invitation already used' });
       }
 
+      // Enforce feature lock: multiple_accountability_partners if user already has one
+      const { countAcceptedPartners, requireFeatureUnlocked } = await import('../services/featureService');
+      const partnersCount = await countAcceptedPartners(userId);
+      if (partnersCount >= 1) {
+        await requireFeatureUnlocked(userId, 'multiple_accountability_partners');
+      }
+
       invitation.receiverId = userId;
       invitation.usedAt = new Date();
       await invitation.save();
@@ -442,9 +456,11 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         sender: json?.sender || null,
         receiver: json?.receiver || null,
       });
-    } catch (error) {
+    } catch (error: any) {
       request.log.error('Error accepting invitation:', error);
-      return reply.status(500).send({ success: false, message: 'Failed to accept invitation' });
+      const status = (error?.statusCode === 403) ? 403 : 500;
+      const msg = error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to accept invitation';
+      return reply.status(status).send({ success: false, message: msg });
     }
   });
 
@@ -480,6 +496,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           .send({ success: false, message: 'Invitation already used' });
       }
 
+      // Enforce feature lock: multiple_accountability_partners if user already has one
+      const { countAcceptedPartners, requireFeatureUnlocked } = await import('../services/featureService');
+      const partnersCount = await countAcceptedPartners(userId);
+      if (partnersCount >= 1) {
+        await requireFeatureUnlocked(userId, 'multiple_accountability_partners');
+      }
+
       invitation.receiverId = userId;
       invitation.usedAt = new Date();
       await invitation.save();
@@ -507,11 +530,11 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         sender: json?.sender || null,
         receiver: json?.receiver || null,
       });
-    } catch (error) {
+    } catch (error: any) {
       request.log.error('Error accepting invitation by code:', error);
-      return reply
-        .status(500)
-        .send({ success: false, message: 'Failed to accept invitation' });
+      const status = (error?.statusCode === 403) ? 403 : 500;
+      const msg = error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to accept invitation';
+      return reply.status(status).send({ success: false, message: msg });
     }
   });
 }
