@@ -36,6 +36,7 @@ import FastProgressLog from './FastProgressLog';
 import FastReminderLog from './FastReminderLog';
 import FastJournal from './FastJournal';
 import DeviceToken from './DeviceToken';
+import FastMessage from './FastMessage';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -70,6 +71,13 @@ FastJournal.belongsTo(Fast, { foreignKey: 'fastId', as: 'fast' });
 FastPrayerLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 FastProgressLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 FastJournal.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+// Fast messages associations
+Fast.hasMany(FastMessage, { foreignKey: 'fastId', as: 'messages' });
+FastMessage.belongsTo(Fast, { foreignKey: 'fastId', as: 'fast' });
+User.hasMany(FastMessage, { foreignKey: 'senderId', as: 'sentFastMessages' });
+User.hasMany(FastMessage, { foreignKey: 'recipientId', as: 'receivedFastMessages' });
+FastMessage.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
+FastMessage.belongsTo(User, { foreignKey: 'recipientId', as: 'recipient' });
 
 // Device tokens
 User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
@@ -233,6 +241,7 @@ export {
   FastReminderLog,
   FastJournal,
   DeviceToken,
+  FastMessage,
 };
 
 // Export a function to sync all models
@@ -275,4 +284,5 @@ export default {
   FastProgressLog,
   FastReminderLog,
   DeviceToken,
+  FastMessage,
 };

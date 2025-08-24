@@ -10,6 +10,12 @@ export interface IFast {
   userId: number;
   type: FastType;
   status: FastStatus;
+  scheduleKind?: 'fixed' | 'recurring' | null;
+  frequency?: 'daily' | 'weekly' | null; // for recurring
+  daysOfWeek?: number[] | null; // for weekly recurring, 0=Sun..6=Sat
+  windowStart?: string | null; // 'HH:mm' in timezone
+  windowEnd?: string | null;   // 'HH:mm' in timezone
+  timezone?: string | null;    // IANA timezone
   goal?: string | null;
   smartGoal?: string | null;
   prayerTimes?: string[] | null; // HH:mm strings in user's local time
@@ -33,6 +39,12 @@ type FastCreation = Optional<
   | 'status'
   | 'goal'
   | 'smartGoal'
+  | 'scheduleKind'
+  | 'frequency'
+  | 'daysOfWeek'
+  | 'windowStart'
+  | 'windowEnd'
+  | 'timezone'
   | 'prayerTimes'
   | 'verse'
   | 'prayerFocus'
@@ -51,6 +63,12 @@ class Fast extends Model<IFast, FastCreation> implements IFast {
   public userId!: number;
   public type!: FastType;
   public status!: FastStatus;
+  public scheduleKind!: 'fixed' | 'recurring' | null;
+  public frequency!: 'daily' | 'weekly' | null;
+  public daysOfWeek!: number[] | null;
+  public windowStart!: string | null;
+  public windowEnd!: string | null;
+  public timezone!: string | null;
   public goal!: string | null;
   public smartGoal!: string | null;
   public prayerTimes!: string[] | null;
@@ -82,6 +100,12 @@ Fast.init(
       allowNull: false,
       defaultValue: 'upcoming',
     },
+  scheduleKind: { type: DataTypes.ENUM('fixed', 'recurring'), allowNull: true, field: 'schedule_kind', comment: 'fixed or recurring schedule' },
+  frequency: { type: DataTypes.ENUM('daily', 'weekly'), allowNull: true, field: 'frequency', comment: 'for recurring schedules' },
+  daysOfWeek: { type: DataTypes.JSON, allowNull: true, field: 'days_of_week', comment: 'array of 0..6 when weekly' },
+  windowStart: { type: DataTypes.STRING(5), allowNull: true, field: 'window_start', comment: 'HH:mm local start for recurring window' },
+  windowEnd: { type: DataTypes.STRING(5), allowNull: true, field: 'window_end', comment: 'HH:mm local end for recurring window' },
+  timezone: { type: DataTypes.STRING(64), allowNull: true, defaultValue: 'UTC', field: 'timezone' },
     goal: { type: DataTypes.TEXT, allowNull: true },
     smartGoal: { type: DataTypes.TEXT, allowNull: true, field: 'smart_goal' },
     prayerTimes: { type: DataTypes.JSON, allowNull: true, field: 'prayer_times' },

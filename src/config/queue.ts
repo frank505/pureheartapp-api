@@ -52,6 +52,7 @@ export const JOB_TYPES = {
     PASSWORD_CHANGED: 'send-password-changed-notification',
     GROUP_INVITE: 'send-group-invite-email',
     ACCOUNTABILITY_INVITE: 'send-accountability-invite-email',
+  FAST_STARTED: 'fast-started-email',
   },
   NOTIFICATIONS: {
     PUSH_NOTIFICATION: 'send-push-notification',

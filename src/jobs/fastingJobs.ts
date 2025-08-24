@@ -66,40 +66,93 @@ export const scheduleFastingCron = () => {
     // Fetch active fasts with reminders enabled
     const actives = await Fast.findAll({ where: { status: 'active', reminderEnabled: true } });
     if (!actives.length) return;
-
-    // Determine current UTC keys once
-    const yyyy = now.getUTCFullYear();
-    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(now.getUTCDate()).padStart(2, '0');
-    const hh = String(now.getUTCHours()).padStart(2, '0');
-    const mi = String(now.getUTCMinutes()).padStart(2, '0');
-    const dateKey = `${yyyy}-${mm}-${dd}`;
-    const timeKey = `${hh}:${mi}`;
+    
+    // Build per-fast jobs based on schedule kinds and timezone-aware minute matching
 
     // Build per-fast jobs and dispatch via queue in parallel
     const queue = queueManager.getFastingQueue();
     const jobOpts: JobsOptions = DEFAULT_JOB_OPTIONS.fasting as any;
+    const jobs: Promise<any>[] = [];
+    for (const fast of actives) {
+      // If the fast has expired, finalize it and skip notifications (safety net in addition to the bulk update above)
+      if (fast.scheduleKind === 'fixed' && now >= fast.endTime) {
+        jobs.push(
+          Fast.update(
+            { status: 'completed', completedAt: now } as any,
+            { where: { id: fast.id, status: 'active' } }
+          )
+        );
+        continue;
+      } else if (fast.scheduleKind === 'recurring' && now > fast.endTime) {
+        jobs.push(
+          Fast.update(
+            { status: 'completed', completedAt: now } as any,
+            { where: { id: fast.id, status: 'active' } }
+          )
+        );
+        continue; // recurring validity window exceeded
+      }
 
-    const jobsToAdd = actives
-      .map((fast) => ({ fast, times: (fast.prayerTimes || []).filter((t: string) => /^\d{2}:\d{2}$/.test(t)) }))
-      .filter(({ times }) => times.includes(timeKey))
-      .map(({ fast }) => {
+      // Skip if outside fixed schedule window (but not expired)
+      if (fast.scheduleKind === 'fixed') {
+        if (now < fast.startTime) continue;
+      }
+
+      // Determine user timezone
+      const tz = (fast as any).timezone || 'UTC';
+      const fmtDate = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+      const fmtTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+      const fmtDow = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' });
+      const [{ value: dateStr }] = (fmtDate as any).formatToParts(now).filter((p: any) => p.type === 'year' || p.type === 'month' || p.type === 'day');
+  const timeStr = fmtTime.format(now); // HH:mm
+  const [hhmm] = timeStr.split(' ');
+  const timeKey: string = (hhmm || timeStr) as string; // ensure string
+      // Build YYYY-MM-DD using formatter reliably
+      const y = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric' }).format(now);
+      const m = new Intl.DateTimeFormat('en-CA', { timeZone: tz, month: '2-digit' }).format(now);
+      const d = new Intl.DateTimeFormat('en-CA', { timeZone: tz, day: '2-digit' }).format(now);
+      const dateKey = `${y}-${m}-${d}`;
+
+      let match = false;
+      if (fast.scheduleKind === 'recurring' && fast.frequency) {
+        if (fast.frequency === 'daily') {
+          // within window?
+          if (fast.windowStart && fast.windowEnd) {
+            const start = fast.windowStart || undefined;
+            const end = fast.windowEnd || undefined;
+            if (start && end && start <= end) {
+              match = timeKey === start || timeKey === end || (Array.isArray(fast.prayerTimes) ? fast.prayerTimes.includes(timeKey) : false);
+            } else {
+              // crosses midnight: consider both days, but we only send at explicit prayerTimes list if provided
+              match = (!!start && timeKey === start) || (!!end && timeKey === end) || (Array.isArray(fast.prayerTimes) ? fast.prayerTimes.includes(timeKey) : false);
+            }
+          } else {
+            match = Array.isArray(fast.prayerTimes) ? fast.prayerTimes.includes(timeKey) : false;
+          }
+        } else if (fast.frequency === 'weekly') {
+          const dowStr = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(now);
+          const dowMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          const dow = dowMap[dowStr] ?? new Date().getUTCDay();
+          const days = (fast.daysOfWeek || []) as number[];
+          if (Array.isArray(days) && days.includes(dow)) {
+            match = (Array.isArray(fast.prayerTimes) ? fast.prayerTimes.includes(timeKey) : false) || (fast.windowStart === timeKey) || (fast.windowEnd === timeKey);
+          }
+        }
+      } else {
+        // Legacy behavior: prayerTimes exact minute match
+        match = Array.isArray(fast.prayerTimes) ? fast.prayerTimes.includes(timeKey) : false;
+      }
+
+      if (match) {
         const title = 'Prayer Time Reminder';
         const body = fast.prayerFocus ? `It's time to pray — ${fast.prayerFocus}` : "It's time to pray";
         const data = { purpose: 'fast_prayer', fastId: String(fast.id), timeKey } as Record<string, any>;
-        const payload: FastingReminderJobData = {
-          fastId: fast.id,
-          userId: fast.userId,
-          dateKey,
-          timeKey,
-          title,
-          body,
-          data,
-        };
-        return queue.add(JOB_TYPES.FASTING.SEND_PRAYER_REMINDER, payload, jobOpts);
-      });
+  const payload: FastingReminderJobData = { fastId: fast.id, userId: fast.userId, dateKey: dateKey as string, timeKey: timeKey as string, title, body, data };
+        jobs.push(queue.add(JOB_TYPES.FASTING.SEND_PRAYER_REMINDER, payload, jobOpts));
+      }
+    }
 
-    await Promise.all(jobsToAdd);
+    await Promise.all(jobs);
   });
 };
 

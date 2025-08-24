@@ -48,6 +48,12 @@ export interface AccountabilityInviteEmailJobData {
   inviteCode: string;
 }
 
+export interface FastStartedEmailJobData {
+  email: string;
+  partnerName: string;
+  fasterName: string;
+}
+
 /**
  * Union type for all email job data
  */
@@ -57,7 +63,8 @@ export type EmailJobData =
   | EmailVerificationJobData
   | PasswordChangedNotificationJobData
   | GroupInviteEmailJobData
-  | AccountabilityInviteEmailJobData;
+  | AccountabilityInviteEmailJobData
+  | FastStartedEmailJobData;
 
 /**
  * Email job processor class
@@ -203,6 +210,24 @@ export class EmailJobProcessor {
       throw error;
     }
   }
+
+  /**
+   * Process fast started email job
+   */
+  async processFastStartedEmail(job: Job<FastStartedEmailJobData>): Promise<void> {
+    const { email, partnerName, fasterName } = job.data;
+    job.log(`Processing fast started email for ${email} (partner ${partnerName})`);
+    try {
+      const success = await this.emailService.sendFastStartedEmail(email, partnerName, fasterName);
+      if (!success) {
+        throw new Error('Failed to send fast started email');
+      }
+      job.log(`✅ Fast started email sent to ${email}`);
+    } catch (error) {
+      job.log(`❌ Failed to send fast started email to ${email}: ${error}`);
+      throw error;
+    }
+  }
 }
 
 /**
@@ -260,6 +285,9 @@ export class EmailWorker {
 
         case JOB_TYPES.EMAIL.ACCOUNTABILITY_INVITE:
           await this.processor.processAccountabilityInviteEmail(job as Job<AccountabilityInviteEmailJobData>);
+          break;
+        case JOB_TYPES.EMAIL.FAST_STARTED:
+          await this.processor.processFastStartedEmail(job as Job<FastStartedEmailJobData>);
           break;
 
         default:
@@ -449,6 +477,21 @@ export class EmailQueueService {
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 50 },
       }
+    );
+  }
+
+  /** Add fast started email job */
+  static async addFastStartedEmailJob(
+    email: string,
+    partnerName: string,
+    fasterName: string,
+    priority: number = 3
+  ) {
+    const emailQueue = queueManager.getEmailQueue();
+    return emailQueue.add(
+      JOB_TYPES.EMAIL.FAST_STARTED,
+      { email, partnerName, fasterName },
+      { priority, removeOnComplete: { count: 100 }, removeOnFail: { count: 50 } }
     );
   }
 

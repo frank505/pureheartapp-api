@@ -49,6 +49,7 @@ import './models/FastPrayerLog';
 import './models/FastProgressLog';
 import './models/FastReminderLog';
 import './models/FastJournal';
+import './models/FastMessage';
 
 /**
  * Create and configure Fastify server instance

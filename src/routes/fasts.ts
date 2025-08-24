@@ -10,16 +10,36 @@ import FastJournal from '../models/FastJournal';
 import AccountabilityPartner from '../models/AccountabilityPartner';
 import AccountabilityComment from '../models/AccountabilityComment';
 import { PushQueue } from '../jobs/notificationJobs';
+import User from '../models/User';
+import { EmailQueueService } from '../jobs/emailJobs';
+
+const fixedScheduleSchema = Joi.object({
+  kind: Joi.string().valid('fixed').required(),
+  startAt: Joi.string().isoDate().required(),
+  endAt: Joi.string().isoDate().required(),
+  timezone: Joi.string().optional(),
+});
+
+const recurringScheduleSchema = Joi.object({
+  kind: Joi.string().valid('recurring').required(),
+  frequency: Joi.string().valid('daily', 'weekly').required(),
+  daysOfWeek: Joi.alternatives().conditional('frequency', {
+    is: 'weekly',
+    then: Joi.array().items(Joi.number().integer().min(0).max(6)).min(1).required(),
+    otherwise: Joi.forbidden(),
+  }),
+  window: Joi.object({ start: Joi.string().pattern(/^\d{2}:\d{2}$/).required(), end: Joi.string().pattern(/^\d{2}:\d{2}$/).required() }).required(),
+  timezone: Joi.string().required(),
+});
 
 const createFastSchema = Joi.object({
   type: Joi.string().valid('daily', 'nightly', 'weekly', 'custom', 'breakthrough').required(),
+  schedule: Joi.alternatives().try(fixedScheduleSchema, recurringScheduleSchema).required(),
   goal: Joi.string().optional(),
   smartGoal: Joi.string().optional(),
   prayerTimes: Joi.array().items(Joi.string().pattern(/^\d{2}:\d{2}$/)).default([]),
   verse: Joi.string().optional(),
   prayerFocus: Joi.string().optional(),
-  startTime: Joi.date().iso().required(),
-  endTime: Joi.date().iso().required(),
   reminderEnabled: Joi.boolean().default(true),
   widgetEnabled: Joi.boolean().default(true),
   addAccountabilityPartners: Joi.boolean().default(false),
@@ -69,13 +89,42 @@ export default async function fastRoutes(fastify: FastifyInstance) {
       const response: IAPIResponse = { success: false, message: 'Validation failed', statusCode: 400, error: error.message };
       return reply.status(400).send(response);
     }
-    const userId = (request as any).userId as number;
+  const userId = (request as any).userId as number;
+  const userRow = await User.findByPk(userId);
 
-    const start = new Date(value.startTime);
-    const end = new Date(value.endTime);
-    // Validate time range
+    // Normalize schedule into Fast fields
+    let start: Date;
+    let end: Date;
+    let scheduleKind: 'fixed' | 'recurring' | null = null;
+    let frequency: 'daily' | 'weekly' | null = null;
+    let daysOfWeek: number[] | null = null;
+    let windowStart: string | null = null;
+    let windowEnd: string | null = null;
+    let timezone: string | null = null;
+
+    if (value.schedule.kind === 'fixed') {
+      scheduleKind = 'fixed';
+      start = new Date(value.schedule.startAt);
+      end = new Date(value.schedule.endAt);
+      timezone = value.schedule.timezone || userRow?.timezone || null; // informative only; dates carry offset
+    } else {
+      scheduleKind = 'recurring';
+      frequency = value.schedule.frequency;
+      timezone = value.schedule.timezone || userRow?.timezone || 'UTC';
+      daysOfWeek = value.schedule.frequency === 'weekly' ? (value.schedule.daysOfWeek as number[]) : null;
+      windowStart = value.schedule.window.start;
+      windowEnd = value.schedule.window.end;
+      // For recurring, set a long-running window; use now and +1 year
+      const now = new Date();
+      start = now;
+      const oneYearLater = new Date(now.getTime());
+      oneYearLater.setUTCFullYear(now.getUTCFullYear() + 1);
+      end = oneYearLater;
+    }
+
+    // Validate
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
-      return reply.status(400).send({ success: false, message: 'endTime must be after startTime', statusCode: 400 });
+      return reply.status(400).send({ success: false, message: 'Invalid schedule time range', statusCode: 400 });
     }
 
     // Prevent multiple concurrent/scheduled fasts
@@ -94,13 +143,56 @@ export default async function fastRoutes(fastify: FastifyInstance) {
       prayerTimes: value.prayerTimes ?? [],
       verse: value.verse ?? null,
       prayerFocus: value.prayerFocus ?? null,
-      startTime: start,
-      endTime: end,
+  startTime: start,
+  endTime: end,
+  scheduleKind,
+  frequency,
+  daysOfWeek,
+  windowStart,
+  windowEnd,
+  timezone,
       status,
       reminderEnabled: value.reminderEnabled ?? true,
       widgetEnabled: value.widgetEnabled ?? true,
       addAccountabilityPartners: value.addAccountabilityPartners ?? false,
     });
+
+    // If user wants partner accountability, notify established partners (those with receiverId present)
+    if (created.addAccountabilityPartners) {
+      try {
+        const [faster, partnerships] = await Promise.all([
+          User.findByPk(userId),
+          AccountabilityPartner.findAll({ where: { userId, receiverId: { [Op.ne]: null } } }),
+        ]);
+        const partnerIds = partnerships
+          .map((p) => p.receiverId)
+          .filter((id): id is number => id != null);
+        if (partnerIds.length) {
+          // Fetch partner users to get names and emails
+          const partners = await User.findAll({ where: { id: { [Op.in]: partnerIds } } });
+          const fasterName = faster ? faster.getFullName() : 'Your partner';
+          await Promise.all([
+            // Push notifications to partners via queue helper
+            ...partners.map((pu) =>
+              PushQueue.sendNotification({
+                type: 'generic',
+                actorId: userId,
+                targetUserId: pu.id,
+                title: 'Your partner started a fast',
+                body: `${fasterName} just started a fast. Encourage and pray for them.`,
+                data: { purpose: 'fast_started', fastId: String(created.id) },
+              })
+            ),
+            // Emails to partners via email queue
+            ...partners
+              .filter((pu) => !!pu.email)
+              .map((pu) => EmailQueueService.addFastStartedEmailJob(pu.email, pu.firstName || 'Partner', fasterName)),
+          ]);
+        }
+      } catch (notifyErr) {
+        request.log.error('Error notifying accountability partners on fast create:', notifyErr);
+      }
+    }
 
     const response: IAPIResponse = { success: true, message: 'Fast created', statusCode: 201, data: created };
     return reply.status(201).send(response);
@@ -485,4 +577,101 @@ export default async function fastRoutes(fastify: FastifyInstance) {
     const items = await AccountabilityComment.findAll({ where: { targetType: 'fast_journal', targetId: journal.id }, order: [['createdAt', 'ASC']] });
     return reply.status(200).send({ success: true, message: 'Comments', statusCode: 200, data: items });
   });
+
+  // PARTNER VIEWS
+  // GET /fasts/partners/active - list fasters who assigned current user and are actively fasting
+  fastify.get('/fasts/partners/active', async (request, reply) => {
+    const partnerId = (request as any).userId as number;
+    const q = request.query as any;
+    const page = Math.max(1, parseInt(q?.page || '1', 10));
+    const limit = Math.min(50, Math.max(1, parseInt(q?.limit || '10', 10)));
+    const offset = (page - 1) * limit;
+
+    // Partnerships where the faster (userId) assigned current user as receiver
+    const partnerships = await AccountabilityPartner.findAll({ where: { receiverId: partnerId } });
+    const fasterIds = Array.from(new Set(partnerships.map(p => p.userId)));
+    if (!fasterIds.length) {
+      return reply.status(200).send({ success: true, message: 'Active fasters', statusCode: 200, data: { items: [], total: 0, page, limit } });
+    }
+
+    const { rows: fasts, count } = await Fast.findAndCountAll({
+      where: {
+        userId: { [Op.in]: fasterIds },
+        status: 'active',
+        addAccountabilityPartners: true,
+      },
+      order: [['endTime', 'ASC']],
+      limit,
+      offset,
+    });
+
+    const userIds = Array.from(new Set(fasts.map(f => f.userId)));
+    const users = await User.findAll({ where: { id: { [Op.in]: userIds } } });
+    const userMap = new Map(users.map(u => [u.id, u] as const));
+
+    const now = new Date();
+    const items = fasts.map(f => {
+      const totalHours = Math.max(0, (f.endTime.getTime() - f.startTime.getTime()) / 3600000);
+      const elapsed = Math.max(0, Math.min(now.getTime(), f.endTime.getTime()) - f.startTime.getTime()) / 3600000;
+      const percentage = totalHours > 0 ? Math.min(100, (elapsed / totalHours) * 100) : 0;
+      const u = userMap.get(f.userId);
+      return {
+        fastId: f.id,
+        type: f.type,
+        startTime: f.startTime,
+        endTime: f.endTime,
+        progress: {
+          percentage,
+          hoursCompleted: Math.round(elapsed * 10) / 10,
+          totalHours: Math.round(totalHours * 10) / 10,
+        },
+        user: u
+          ? {
+              id: u.id,
+              firstName: u.firstName,
+              lastName: u.lastName,
+              avatar: (u as any).avatar ?? null,
+              username: (u as any).username,
+            }
+          : { id: f.userId },
+      };
+    });
+
+    return reply.status(200).send({ success: true, message: 'Active fasters', statusCode: 200, data: { items, total: count, page, limit } });
+  });
+
+  // GET /fasts/partners/:userId/journals - list partner-visible journals for a given faster's active fast(s)
+  fastify.get('/fasts/partners/:userId/journals', async (request, reply) => {
+    const partnerId = (request as any).userId as number;
+    const fasterId = Number((request.params as any).userId);
+    const q = request.query as any;
+    const page = Math.max(1, parseInt(q?.page || '1', 10));
+    const limit = Math.min(50, Math.max(1, parseInt(q?.limit || '10', 10)));
+    const offset = (page - 1) * limit;
+
+    // Verify directional partnership: faster assigned current user
+    const partnership = await AccountabilityPartner.findOne({ where: { userId: fasterId, receiverId: partnerId } });
+    if (!partnership) return reply.status(403).send({ success: false, message: 'Forbidden', statusCode: 403 });
+
+    // Active fasts for this faster where partner sharing is enabled
+    const activeFasts = await Fast.findAll({ where: { userId: fasterId, status: 'active', addAccountabilityPartners: true } });
+    if (!activeFasts.length) {
+      return reply.status(200).send({ success: true, message: 'Journals', statusCode: 200, data: { items: [], total: 0, page, limit } });
+    }
+    const fastIds = activeFasts.map(f => f.id);
+
+    const { rows, count } = await FastJournal.findAndCountAll({
+      where: {
+        userId: fasterId,
+        fastId: { [Op.in]: fastIds },
+        visibility: 'partner',
+      },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    return reply.status(200).send({ success: true, message: 'Journals', statusCode: 200, data: { items: rows, total: count, page, limit } });
+  });
+
 }
