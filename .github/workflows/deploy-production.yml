@@ -1,0 +1,209 @@
+name: Deploy to Production (Hetzner)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          # App env
+          NODE_ENV: ${{ secrets.NODE_ENV }}
+          PORT: ${{ secrets.PORT }}
+          HOST: ${{ secrets.HOST }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
+          JWT_REFRESH_EXPIRES_IN: ${{ secrets.JWT_REFRESH_EXPIRES_IN }}
+          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+          EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+          EMAIL_SECURE: ${{ secrets.EMAIL_SECURE }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          APP_NAME: ${{ secrets.APP_NAME }}
+          APP_URL: ${{ secrets.APP_URL }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          APP_STORE_URL: ${{ secrets.APP_STORE_URL }}
+          BCRYPT_ROUNDS: ${{ secrets.BCRYPT_ROUNDS }}
+          PASSWORD_RESET_EXPIRES: ${{ secrets.PASSWORD_RESET_EXPIRES }}
+          EMAIL_VERIFICATION_EXPIRES: ${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          INVITE_MATCH_WINDOW_SECONDS: ${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          MISSING=()
+          REQUIRED=(
+            PRODUCTION_HOST PRODUCTION_USER PRODUCTION_PATH SSH_PRIVATE_KEY
+            NODE_ENV PORT HOST
+            DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD
+            REDIS_HOST REDIS_PORT
+            JWT_SECRET JWT_EXPIRES_IN JWT_REFRESH_EXPIRES_IN
+            EMAIL_HOST EMAIL_PORT EMAIL_USER EMAIL_PASS EMAIL_FROM
+            APP_NAME APP_URL FRONTEND_URL APP_STORE_URL
+            BCRYPT_ROUNDS PASSWORD_RESET_EXPIRES EMAIL_VERIFICATION_EXPIRES
+            GOOGLE_CLIENT_ID INVITE_MATCH_WINDOW_SECONDS
+          )
+          for v in "${REQUIRED[@]}"; do
+            if [ -z "${!v}" ]; then MISSING+=($v); fi
+          done
+          if [ ${#MISSING[@]} -ne 0 ]; then
+            echo "Missing required secrets:"; printf '%s\n' "${MISSING[@]}"; exit 1
+          fi
+          echo "All required secrets present."
+
+  build-and-deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create .env.production
+        run: |
+          cat << 'EOF' > .env.production
+          NODE_ENV=${{ secrets.NODE_ENV }}
+          PORT=${{ secrets.PORT }}
+          HOST=${{ secrets.HOST }}
+
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+          JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}
+
+          EMAIL_HOST=${{ secrets.EMAIL_HOST }}
+          EMAIL_PORT=${{ secrets.EMAIL_PORT }}
+          EMAIL_SECURE=${{ secrets.EMAIL_SECURE }}
+          EMAIL_USER=${{ secrets.EMAIL_USER }}
+          EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+
+          APP_NAME=${{ secrets.APP_NAME }}
+          APP_URL=${{ secrets.APP_URL }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          APP_STORE_URL=${{ secrets.APP_STORE_URL }}
+
+          BCRYPT_ROUNDS=${{ secrets.BCRYPT_ROUNDS }}
+          PASSWORD_RESET_EXPIRES=${{ secrets.PASSWORD_RESET_EXPIRES }}
+          EMAIL_VERIFICATION_EXPIRES=${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
+
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          INVITE_MATCH_WINDOW_SECONDS=${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
+
+          GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+
+          FIREBASE_SERVICE_ACCOUNT_JSON=${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          EOF
+
+      - name: Create deploy bundle (dist + assets)
+        run: |
+          tar -czf deploy.tar.gz \
+            dist \
+            public \
+            src/1min_clips \
+            package.json \
+            package-lock.json \
+            ecosystem.config.js
+
+      - name: Push files to server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "sudo mkdir -p ${{ secrets.PRODUCTION_PATH }} && sudo chown -R ${{ secrets.PRODUCTION_USER }}:${{ secrets.PRODUCTION_USER }} ${{ secrets.PRODUCTION_PATH }}"
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no .env.production ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/.env
+
+      - name: Install and restart on server
+        env:
+          NODE_VERSION: ${{ vars.PRODUCTION_NODE_VERSION || '20' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOSSH'
+          set -euo pipefail
+          cd ${{ secrets.PRODUCTION_PATH }}
+
+          # Extract bundle
+          tar -xzf deploy.tar.gz && rm -f deploy.tar.gz
+
+          # Ensure logs dir for PM2
+          mkdir -p logs
+
+          # Ensure Node.js is available (install if missing)
+          if ! command -v node >/dev/null 2>&1; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+          fi
+
+          # Install PM2 if missing
+          if ! command -v pm2 >/dev/null 2>&1; then
+            sudo npm i -g pm2
+          fi
+
+          # Install production deps only
+          npm ci --omit=dev
+
+          # Start or reload app with PM2
+          if [ -f ecosystem.config.js ]; then
+            pm2 startOrReload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+          else
+            pm2 start dist/server.js --name pureheartapp-api
+          fi
+
+          pm2 save
+
+          # Quick health check
+          sleep 2
+          curl -fsS http://127.0.0.1:${{ secrets.PORT }}/health || true
+          EOSSH
+
+      - name: Cleanup local
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key .env.production deploy.tar.gz
