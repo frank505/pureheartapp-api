@@ -1,13 +1,9 @@
-name: Deploy to Production (Hetzner)
+name: Deploy to Production
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
-concurrency:
-  group: production-deploy
-  cancel-in-progress: false
 
 jobs:
   validate:
@@ -15,31 +11,38 @@ jobs:
     steps:
       - name: Check required secrets
         env:
+          # Deployment secrets
           PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
           PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          # App env
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+          # App configuration
           NODE_ENV: ${{ secrets.NODE_ENV }}
           PORT: ${{ secrets.PORT }}
           HOST: ${{ secrets.HOST }}
+          # Database configuration
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          # Redis configuration
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          # JWT configuration
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
           JWT_REFRESH_EXPIRES_IN: ${{ secrets.JWT_REFRESH_EXPIRES_IN }}
+          # Email configuration
           EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
           EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
           EMAIL_SECURE: ${{ secrets.EMAIL_SECURE }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # App settings
           APP_NAME: ${{ secrets.APP_NAME }}
           APP_URL: ${{ secrets.APP_URL }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
@@ -47,79 +50,134 @@ jobs:
           BCRYPT_ROUNDS: ${{ secrets.BCRYPT_ROUNDS }}
           PASSWORD_RESET_EXPIRES: ${{ secrets.PASSWORD_RESET_EXPIRES }}
           EMAIL_VERIFICATION_EXPIRES: ${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
+          # Google and Firebase configuration
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           INVITE_MATCH_WINDOW_SECONDS: ${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
-          MISSING=()
-          REQUIRED=(
-            PRODUCTION_HOST PRODUCTION_USER PRODUCTION_PATH SSH_PRIVATE_KEY
-            NODE_ENV PORT HOST
-            DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD
-            REDIS_HOST REDIS_PORT
-            JWT_SECRET JWT_EXPIRES_IN JWT_REFRESH_EXPIRES_IN
-            EMAIL_HOST EMAIL_PORT EMAIL_USER EMAIL_PASS EMAIL_FROM
-            APP_NAME APP_URL FRONTEND_URL APP_STORE_URL
-            BCRYPT_ROUNDS PASSWORD_RESET_EXPIRES EMAIL_VERIFICATION_EXPIRES
-            GOOGLE_CLIENT_ID INVITE_MATCH_WINDOW_SECONDS
-          )
-          for v in "${REQUIRED[@]}"; do
-            if [ -z "${!v}" ]; then MISSING+=($v); fi
+          MISSING_SECRETS=()
+          
+          # Define variables to check
+          REQUIRED_VARS=(
+            # Deployment
+            "PRODUCTION_HOST"
+            "PRODUCTION_USER"
+            "PRODUCTION_PATH"
+            "SSH_PRIVATE_KEY"
+            "SSH_PASSPHRASE"
+            # App
+            "NODE_ENV"
+            "PORT"
+            "HOST"
+            # Database
+            "DB_HOST"
+            "DB_PORT"
+            "DB_NAME"
+            "DB_USER"
+            "DB_PASSWORD"
+            # Redis
+            "REDIS_HOST"
+            "REDIS_PORT"
+            "REDIS_PASSWORD"
+            # JWT
+            "JWT_SECRET"
+            "JWT_EXPIRES_IN"
+            "JWT_REFRESH_EXPIRES_IN"
+            # Email
+            "EMAIL_HOST"
+            "EMAIL_PORT"
+            "EMAIL_SECURE"
+            "EMAIL_USER"
+            "EMAIL_PASS"
+            "EMAIL_FROM"
+            # App settings
+            "APP_NAME"
+            "APP_URL"
+            "FRONTEND_URL"
+            "APP_STORE_URL"
+            "BCRYPT_ROUNDS"
+            "PASSWORD_RESET_EXPIRES"
+            "EMAIL_VERIFICATION_EXPIRES"
+            # Google and Firebase
+            "GOOGLE_CLIENT_ID"
+            "INVITE_MATCH_WINDOW_SECONDS"
+            "GOOGLE_API_KEY"
+            "GEMINI_API_KEY"
+            "FIREBASE_SERVICE_ACCOUNT_JSON"          # Check only our required variables
+          for var in "${REQUIRED_VARS[@]}"; do
+            if [ -z "${!var}" ]; then
+              MISSING_SECRETS+=($var)
+            fi
           done
-          if [ ${#MISSING[@]} -ne 0 ]; then
-            echo "Missing required secrets:"; printf '%s\n' "${MISSING[@]}"; exit 1
-          fi
-          echo "All required secrets present."
 
-  build-and-deploy:
-    needs: validate
+          if [ ${#MISSING_SECRETS[@]} -ne 0 ]; then
+            echo "❌ Missing required secrets:"
+            printf '%s\n' "${MISSING_SECRETS[@]}"
+            exit 1
+          fi
+
+          echo "✅ All required secrets are set"
+
+  deploy:
+    needs: [validate]
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Use Node.js 20.x
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 20
-          cache: npm
+          node-version: '18'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build TypeScript
         run: npm run build
 
-      - name: Setup SSH
+      - name: Setup SSH directory
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+          # Write the private key and remove its passphrase
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key_with_pass
+          chmod 600 ~/.ssh/deploy_key_with_pass
+          # Remove passphrase from the key
+          ssh-keygen -p -P "${{ secrets.SSH_PASSPHRASE }}" -N "" -f ~/.ssh/deploy_key_with_pass
+          mv ~/.ssh/deploy_key_with_pass ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "SSH directory setup complete"
 
-      - name: Create .env.production
+      - name: Create .env file
         run: |
-          cat << 'EOF' > .env.production
+          cat << EOF > .env
+          # Server Configuration
           NODE_ENV=${{ secrets.NODE_ENV }}
           PORT=${{ secrets.PORT }}
           HOST=${{ secrets.HOST }}
 
+          # Database Configuration
           DB_HOST=${{ secrets.DB_HOST }}
           DB_PORT=${{ secrets.DB_PORT }}
           DB_NAME=${{ secrets.DB_NAME }}
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
 
+          # Redis Configuration
           REDIS_HOST=${{ secrets.REDIS_HOST }}
           REDIS_PORT=${{ secrets.REDIS_PORT }}
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
 
+          # JWT Configuration
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
           JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}
 
+          # Email Configuration
           EMAIL_HOST=${{ secrets.EMAIL_HOST }}
           EMAIL_PORT=${{ secrets.EMAIL_PORT }}
           EMAIL_SECURE=${{ secrets.EMAIL_SECURE }}
@@ -127,109 +185,162 @@ jobs:
           EMAIL_PASS=${{ secrets.EMAIL_PASS }}
           EMAIL_FROM=${{ secrets.EMAIL_FROM }}
 
+          # Application Configuration
           APP_NAME=${{ secrets.APP_NAME }}
           APP_URL=${{ secrets.APP_URL }}
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           APP_STORE_URL=${{ secrets.APP_STORE_URL }}
-
           BCRYPT_ROUNDS=${{ secrets.BCRYPT_ROUNDS }}
           PASSWORD_RESET_EXPIRES=${{ secrets.PASSWORD_RESET_EXPIRES }}
           EMAIL_VERIFICATION_EXPIRES=${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
-
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           INVITE_MATCH_WINDOW_SECONDS=${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
 
+          # Google and Firebase Configuration
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-
           FIREBASE_SERVICE_ACCOUNT_JSON=${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           EOF
 
-      - name: Create deploy bundle (dist + assets)
+      - name: Check and prepare server
         run: |
-          set -euo pipefail
-          FILES=(package.json package-lock.json ecosystem.config.js)
-          [ -d dist ] && FILES+=("dist")
-          [ -d public ] && FILES+=("public")
-          [ -d src/1min_clips ] && FILES+=("src/1min_clips")
-          echo "Bundling: ${FILES[*]}"
-          tar -czf deploy.tar.gz "${FILES[@]}"
+          # First test SSH connection
+          echo "Testing SSH connection..."
+          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "sudo -i pwd && sudo -i whoami"
 
-      - name: Push files to server
-        env:
-          SSH_HOST: ${{ secrets.PRODUCTION_HOST }}
-          SSH_USER: ${{ secrets.PRODUCTION_USER }}
-          REMOTE_PATH: ${{ secrets.PRODUCTION_PATH }}
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "sudo mkdir -p \"$REMOTE_PATH\" && sudo chown -R \"$SSH_USER:$SSH_USER\" \"$REMOTE_PATH\""
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz "$SSH_USER@$SSH_HOST":"$REMOTE_PATH"/
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no .env.production "$SSH_USER@$SSH_HOST":"$REMOTE_PATH"/.env
+          # Check and install required software
+          echo "Checking required software..."
+          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash -c '
+            # Function to check if a command exists
+            command_exists() {
+              command -v \"$1\" >/dev/null 2>&1
+            }
 
-      - name: Install and restart on server
-        env:
-          SSH_HOST: ${{ secrets.PRODUCTION_HOST }}
-          SSH_USER: ${{ secrets.PRODUCTION_USER }}
-          PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
-          PRODUCTION_PORT: ${{ secrets.PORT }}
-          NODE_VERSION: ${{ vars.PRODUCTION_NODE_VERSION || '20' }}
-          FORCE_NODE_INSTALL: ${{ vars.FORCE_NODE_INSTALL || '0' }}
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "env NODE_VERSION=\"$NODE_VERSION\" FORCE_NODE_INSTALL=\"$FORCE_NODE_INSTALL\" PRODUCTION_PATH=\"$PRODUCTION_PATH\" PRODUCTION_PORT=\"$PRODUCTION_PORT\" bash -s" << 'EOSSH'
-          set -euo pipefail
-          cd "${PRODUCTION_PATH}"
-
-          # Extract bundle
-          tar -xzf deploy.tar.gz && rm -f deploy.tar.gz
-
-          # Ensure logs dir for PM2
-          mkdir -p logs
-
-          # Ensure Node.js is available (install only if missing, avoid duplicates)
-          FORCE_NODE_INSTALL="${FORCE_NODE_INSTALL:-0}"
-          if command -v node >/dev/null 2>&1; then
-            CURRENT_VER=$(node -v | sed 's/^v//')
-            CURRENT_MAJOR=${CURRENT_VER%%.*}
-            DESIRED_MAJOR=${NODE_VERSION%%.*}
-            echo "Found Node.js v${CURRENT_VER} (major ${CURRENT_MAJOR}). Desired major: ${DESIRED_MAJOR}."
-            if [ "${FORCE_NODE_INSTALL}" = "1" ] && [ "${CURRENT_MAJOR}" != "${DESIRED_MAJOR}" ]; then
-              echo "FORCE_NODE_INSTALL=1 and major mismatch detected. Upgrading Node.js to ${NODE_VERSION}." 
-              curl -fsSL https://deb.nodesource.com/setup_${DESIRED_MAJOR}.x | sudo -E bash -
-              sudo apt-get install -y nodejs
+            # Check and install Node.js
+            if command_exists node; then
+              echo \"✅ Node.js is installed ($(node --version))\"
             else
-              if [ "${CURRENT_MAJOR}" != "${DESIRED_MAJOR}" ]; then
-                echo "Note: Node major ${CURRENT_MAJOR} != desired ${DESIRED_MAJOR}. Skipping install to avoid multiple versions. Set FORCE_NODE_INSTALL=1 to override."
-              fi
+              echo \"⚙️ Installing Node.js...\"
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+              echo \"✅ Node.js installed successfully\"
             fi
-          else
-            echo "Node.js not found. Installing Node ${NODE_VERSION}."
-            DESIRED_MAJOR=${NODE_VERSION%%.*}
-            curl -fsSL https://deb.nodesource.com/setup_${DESIRED_MAJOR}.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-          fi
 
-          # Install PM2 if missing
-          if ! command -v pm2 >/dev/null 2>&1; then
-            sudo npm i -g pm2
-          fi
+            # Check and install PM2
+            if command_exists pm2; then
+              echo \"✅ PM2 is installed ($(pm2 --version))\"
+            else
+              echo \"⚙️ Installing PM2...\"
+              sudo npm install -g pm2
+              echo \"✅ PM2 installed successfully\"
+              
+              # Setup PM2 startup script
+              sudo pm2 startup
+            fi
+          '"
 
-          # Install production deps only
-          npm ci --omit=dev
+          # Create and prepare deployment directory
+          echo "Preparing deployment directory..."
+          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash -c '
+            if [ ! -d \"${{ secrets.PRODUCTION_PATH }}\" ]; then
+              echo \"Creating deployment directory...\"
+              sudo mkdir -p ${{ secrets.PRODUCTION_PATH }}
+              echo \"✅ Deployment directory created\"
+            else
+              echo \"✅ Deployment directory already exists\"
+            fi
 
-          # Start or reload app with PM2
-          if [ -f ecosystem.config.js ]; then
-            pm2 startOrReload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
-          else
-            pm2 start dist/server.js --name pureheartapp-api
-          fi
+            # Set correct ownership and permissions
+            sudo chown -R ${{ secrets.PRODUCTION_USER }}:${{ secrets.PRODUCTION_USER }} ${{ secrets.PRODUCTION_PATH }}
+            sudo chmod 755 ${{ secrets.PRODUCTION_PATH }}
+            echo \"✅ Directory permissions set correctly\"
 
-          pm2 save
+            # Create logs directory if it doesn't exist
+            if [ ! -d \"${{ secrets.PRODUCTION_PATH }}/logs\" ]; then
+              mkdir -p ${{ secrets.PRODUCTION_PATH }}/logs
+              echo \"✅ Logs directory created\"
+            fi
+          '"
 
-          # Quick health check
-          sleep 2
-          curl -fsS "http://127.0.0.1:${PRODUCTION_PORT}/health" || true
-          EOSSH
+          # Create temporary archive
+          tar -czf deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='deploy.tar.gz' \
+            .
 
-      - name: Cleanup local
+          # Copy files to server
+          scp -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            deploy.tar.gz \
+            .env \
+            ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
+
+          # Execute deployment commands on server
+          ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash -c '
+            cd ${{ secrets.PRODUCTION_PATH }}
+            
+            # Backup existing node_modules if it exists
+            if [ -d \"node_modules\" ]; then
+              echo \"Backing up node_modules...\"
+              mv node_modules node_modules_backup
+            fi
+            
+            echo \"Extracting new files...\"
+            tar xzf deploy.tar.gz
+            rm deploy.tar.gz
+            
+            # Restore node_modules if backup exists
+            if [ -d \"node_modules_backup\" ]; then
+              echo \"Restoring node_modules...\"
+              rm -rf node_modules
+              mv node_modules_backup node_modules
+            fi
+            
+            # Check if npm is available
+            if ! command -v npm &> /dev/null; then
+              echo \"❌ npm is not installed. Please install Node.js first.\"
+              exit 1
+            fi
+            
+            echo \"Installing dependencies...\"
+            npm install --production
+            
+            # Check if PM2 is available
+            if ! command -v pm2 &> /dev/null; then
+              echo \"❌ PM2 is not installed. Installing globally...\"
+              sudo npm install -g pm2
+              sudo pm2 startup
+            fi
+            
+            # Check if ecosystem.config.js exists
+            if [ ! -f \"ecosystem.config.js\" ]; then
+              echo \"❌ ecosystem.config.js not found!\"
+              exit 1
+            fi
+            
+            echo \"Managing PM2 process...\"
+            if pm2 list | grep -q \"christian-recovery-app\"; then
+              echo \"Reloading existing PM2 process...\"
+              pm2 reload christian-recovery-app
+            else
+              echo \"Starting new PM2 process...\"
+              pm2 start ecosystem.config.js --env production
+            fi
+            
+            # Save PM2 process list
+            pm2 save
+            
+            echo \"✅ Deployment completed successfully\"
+            
+            # Display running processes
+            echo \"Current PM2 processes:\"
+            pm2 list
+          '"
+
+      - name: Cleanup
         if: always()
         run: |
-          rm -f ~/.ssh/deploy_key .env.production deploy.tar.gz
+          rm -f .env
+          rm -f ~/.ssh/deploy_key
+          rm -f deploy.tar.gz
