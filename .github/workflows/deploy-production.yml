@@ -12,11 +12,7 @@ jobs:
       - name: Check required secrets
         env:
           # Deployment secrets
-    # Google and Firebase Configuration
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-          FIREBASE_SERVICE_ACCOUNT_JSON='${{ secrets.JWT_SECRET }}' PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
           PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
           PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -59,98 +55,72 @@ jobs:
           INVITE_MATCH_WINDOW_SECONDS: ${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           MISSING_SECRETS=()
           
+          # Define variables to check
           REQUIRED_VARS=(
-            PRODUCTION_HOST
-            PRODUCTION_USER
-            PRODUCTION_PATH
-            SSH_PRIVATE_KEY
-            SSH_PASSPHRASE
-            NODE_ENV
-            PORT
-            HOST
-            DB_HOST
-            DB_PORT
-            DB_NAME
-            DB_USER
-            DB_PASSWORD
-            REDIS_HOST
-            REDIS_PORT
-            REDIS_PASSWORD
-            JWT_SECRET
-            JWT_EXPIRES_IN
-            JWT_REFRESH_EXPIRES_IN
-            EMAIL_HOST
-            EMAIL_PORT
-            EMAIL_SECURE
-            EMAIL_USER
-            EMAIL_PASS
-            EMAIL_FROM
-            APP_NAME
-            APP_URL
-            FRONTEND_URL
-            APP_STORE_URL
-            BCRYPT_ROUNDS
-            PASSWORD_RESET_EXPIRES
-            EMAIL_VERIFICATION_EXPIRES
-            GOOGLE_CLIENT_ID
-            INVITE_MATCH_WINDOW_SECONDS
-            GOOGLE_API_KEY
-            GEMINI_API_KEY
-            FIREBASE_SERVICE_ACCOUNT_JSON
-          )          missing_count=0
-          check_secret() {
-            if [ -z "${!1}" ]; then
-              echo "::error::Missing required secret: $1"
-              ((missing_count++))
+            # Deployment
+            "PRODUCTION_HOST"
+            "PRODUCTION_USER"
+            "PRODUCTION_PATH"
+            "SSH_PRIVATE_KEY"
+            "SSH_PASSPHRASE"
+            # App
+            "NODE_ENV"
+            "PORT"
+            "HOST"
+            # Database
+            "DB_HOST"
+            "DB_PORT"
+            "DB_NAME"
+            "DB_USER"
+            "DB_PASSWORD"
+            # Redis
+            "REDIS_HOST"
+            "REDIS_PORT"
+            "REDIS_PASSWORD"
+            # JWT
+            "JWT_SECRET"
+            "JWT_EXPIRES_IN"
+            "JWT_REFRESH_EXPIRES_IN"
+            # Email
+            "EMAIL_HOST"
+            "EMAIL_PORT"
+            "EMAIL_SECURE"
+            "EMAIL_USER"
+            "EMAIL_PASS"
+            "EMAIL_FROM"
+            # App settings
+            "APP_NAME"
+            "APP_URL"
+            "FRONTEND_URL"
+            "APP_STORE_URL"
+            "BCRYPT_ROUNDS"
+            "PASSWORD_RESET_EXPIRES"
+            "EMAIL_VERIFICATION_EXPIRES"
+            # Google and Firebase
+            "GOOGLE_CLIENT_ID"
+            "INVITE_MATCH_WINDOW_SECONDS"
+            "GOOGLE_API_KEY"
+            "GEMINI_API_KEY"
+            "FIREBASE_SERVICE_ACCOUNT_JSON"
+          )
+            
+          # Check only our required variables
+          for var in "${REQUIRED_VARS[@]}"; do
+            if [ -z "${!var}" ]; then
+              MISSING_SECRETS+=($var)
             fi
-          }
-          
-          # Check each required secret
-          check_secret "PRODUCTION_HOST"
-          check_secret "PRODUCTION_USER"
-          check_secret "PRODUCTION_PATH"
-          check_secret "SSH_PRIVATE_KEY"
-          check_secret "SSH_PASSPHRASE"
-          check_secret "NODE_ENV"
-          check_secret "PORT"
-          check_secret "HOST"
-          check_secret "DB_HOST"
-          check_secret "DB_PORT"
-          check_secret "DB_NAME"
-          check_secret "DB_USER"
-          check_secret "DB_PASSWORD"
-          check_secret "REDIS_HOST"
-          check_secret "REDIS_PORT"
-          check_secret "REDIS_PASSWORD"
-          check_secret "JWT_SECRET"
-          check_secret "JWT_EXPIRES_IN"
-          check_secret "JWT_REFRESH_EXPIRES_IN"
-          check_secret "EMAIL_HOST"
-          check_secret "EMAIL_PORT"
-          check_secret "EMAIL_SECURE"
-          check_secret "EMAIL_USER"
-          check_secret "EMAIL_PASS"
-          check_secret "EMAIL_FROM"
-          check_secret "APP_NAME"
-          check_secret "APP_URL"
-          check_secret "FRONTEND_URL"
-          check_secret "APP_STORE_URL"
-          check_secret "BCRYPT_ROUNDS"
-          check_secret "PASSWORD_RESET_EXPIRES"
-          check_secret "EMAIL_VERIFICATION_EXPIRES"
-          check_secret "GOOGLE_CLIENT_ID"
-          check_secret "INVITE_MATCH_WINDOW_SECONDS"
-          check_secret "GOOGLE_API_KEY"
-          check_secret "GEMINI_API_KEY"
+          done
 
-          if [ $missing_count -gt 0 ]; then
-            echo "::error::$missing_count required secret(s) are missing"
+          if [ ${#MISSING_SECRETS[@]} -ne 0 ]; then
+            echo "❌ Missing required secrets:"
+            printf '%s\n' "${MISSING_SECRETS[@]}"
             exit 1
           fi
-          
+
           echo "✅ All required secrets are set"
 
   deploy:
