@@ -274,47 +274,41 @@ jobs:
         run: |
           echo "Creating deployment archive..."
           
-          # Create temporary directory for clean archiving
-          mkdir -p /tmp/deploy_staging
+          # Create list of files to include (safer approach)
+          echo "Collecting files for deployment..."
           
-          echo "Copying project files to staging directory..."
-          # Copy project files to staging directory
-          rsync -av \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='.env*' \
-            --exclude='.github' \
-            --exclude='*.log' \
-            --exclude='logs' \
-            --exclude='.DS_Store' \
-            --exclude='*.tmp' \
-            --exclude='*.temp' \
-            --exclude='check_software.sh' \
-            --exclude='prepare_directory.sh' \
-            --exclude='/tmp/' \
-            . /tmp/deploy_staging/
+          # Create a temporary file list
+          find . -type f \
+            -not -path './.git/*' \
+            -not -path './node_modules/*' \
+            -not -path './.github/*' \
+            -not -path './logs/*' \
+            -not -name '.env*' \
+            -not -name '*.log' \
+            -not -name '*.tmp' \
+            -not -name '*.temp' \
+            -not -name '.DS_Store' \
+            -not -name 'check_software.sh' \
+            -not -name 'prepare_directory.sh' \
+            -not -name 'deploy.tar.gz' > /tmp/file_list.txt
           
-          echo "Files copied to staging. Contents:"
-          ls -la /tmp/deploy_staging/
+          echo "Files to be included:"
+          cat /tmp/file_list.txt | head -20
+          echo "Total files: $(wc -l < /tmp/file_list.txt)"
           
-          # Create archive from staging directory
-          echo "Creating tar archive..."
-          cd /tmp/deploy_staging
-          tar -czf deploy.tar.gz .
+          # Create archive using the file list
+          echo "Creating archive from file list..."
+          tar -czf deploy.tar.gz -T /tmp/file_list.txt
           
           echo "Archive created. Size:"
           ls -lh deploy.tar.gz
           
-          # Move archive back to working directory
-          echo "Moving archive to working directory..."
-          mv deploy.tar.gz $GITHUB_WORKSPACE/deploy.tar.gz
+          # Clean up file list
+          rm -f /tmp/file_list.txt
           
-          # Cleanup staging directory
-          rm -rf /tmp/deploy_staging
-          
-          # Verify archive exists in working directory
-          echo "Verifying archive in working directory:"
-          ls -lh $GITHUB_WORKSPACE/deploy.tar.gz
+          # Test archive integrity
+          echo "Testing archive integrity:"
+          tar -tzf deploy.tar.gz | head -10
           
           echo "✅ Deployment archive created successfully"
 
