@@ -53,7 +53,18 @@ check_service() {
 
 # Check environment variables
 check_environment() {
-    print_info "Checking environment variables..."
+    print_info "Loading environment variables from .env file..."
+    
+    # Load environment variables from .env file if it exists
+    if [ -f ".env" ]; then
+        # Export variables from .env file
+        export $(grep -v '^#' .env | grep -v '^$' | xargs)
+        print_status ".env file loaded successfully"
+    else
+        print_warning ".env file not found, checking system environment variables"
+    fi
+    
+    print_info "Checking required environment variables..."
     
     local required_vars=(
         "NODE_ENV"
@@ -78,6 +89,8 @@ check_environment() {
     if [ ${#missing_vars[@]} -ne 0 ]; then
         print_error "Missing required environment variables:"
         printf '%s\n' "${missing_vars[@]}"
+        print_info "Available environment variables starting with common prefixes:"
+        env | grep -E "^(NODE|PORT|DB|REDIS|JWT)" | head -10
         exit 1
     fi
     

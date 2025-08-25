@@ -347,6 +347,15 @@ jobs:
           ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
             cd ${{ secrets.PRODUCTION_PATH }}
             
+            # Ensure .env file has correct permissions
+            if [ -f '.env' ]; then
+              chmod 600 .env
+              echo '✅ .env file permissions set'
+            else
+              echo '❌ .env file not found!'
+              exit 1
+            fi
+            
             # Backup existing node_modules if it exists
             if [ -d 'node_modules' ]; then
               echo 'Backing up node_modules...'
@@ -367,6 +376,9 @@ jobs:
             
             # Make deploy script executable and run it
             chmod +x deploy.sh
+            
+            # Source environment variables and run deployment
+            echo 'Starting deployment script...'
             ./deploy.sh '${{ secrets.PRODUCTION_PATH }}'
           "
 
