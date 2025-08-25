@@ -211,59 +211,64 @@ jobs:
           echo "Testing SSH connection..."
           ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "sudo -i pwd && sudo -i whoami"
 
-          # Check and install required software
-          echo "Checking required software..."
-          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash -c '
-            # Function to check if a command exists
-            command_exists() {
-              command -v \"$1\" >/dev/null 2>&1
-            }
+          # Create the check software script
+          echo "#!/bin/bash" > check_software.sh
+          echo "# Function to check if a command exists" >> check_software.sh
+          echo "command_exists() {" >> check_software.sh
+          echo "  command -v \"\$1\" >/dev/null 2>&1" >> check_software.sh
+          echo "}" >> check_software.sh
+          echo "" >> check_software.sh
+          echo "# Check and install Node.js" >> check_software.sh
+          echo "if command_exists node; then" >> check_software.sh
+          echo "  echo \"✅ Node.js is installed (\$(node --version))\"" >> check_software.sh
+          echo "else" >> check_software.sh
+          echo "  echo \"⚙️ Installing Node.js...\"" >> check_software.sh
+          echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -" >> check_software.sh
+          echo "  sudo apt-get install -y nodejs" >> check_software.sh
+          echo "  echo \"✅ Node.js installed successfully\"" >> check_software.sh
+          echo "fi" >> check_software.sh
+          echo "" >> check_software.sh
+          echo "# Check and install PM2" >> check_software.sh
+          echo "if command_exists pm2; then" >> check_software.sh
+          echo "  echo \"✅ PM2 is installed (\$(pm2 --version))\"" >> check_software.sh
+          echo "else" >> check_software.sh
+          echo "  echo \"⚙️ Installing PM2...\"" >> check_software.sh
+          echo "  sudo npm install -g pm2" >> check_software.sh
+          echo "  echo \"✅ PM2 installed successfully\"" >> check_software.sh
+          echo "  # Setup PM2 startup script" >> check_software.sh
+          echo "  sudo pm2 startup" >> check_software.sh
+          echo "fi" >> check_software.sh
+          
+          chmod +x check_software.sh
+          scp -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes check_software.sh ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:/tmp/
+          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash /tmp/check_software.sh && rm /tmp/check_software.sh"
 
-            # Check and install Node.js
-            if command_exists node; then
-              echo \"✅ Node.js is installed ($(node --version))\"
-            else
-              echo \"⚙️ Installing Node.js...\"
-              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-              sudo apt-get install -y nodejs
-              echo \"✅ Node.js installed successfully\"
-            fi
-
-            # Check and install PM2
-            if command_exists pm2; then
-              echo \"✅ PM2 is installed ($(pm2 --version))\"
-            else
-              echo \"⚙️ Installing PM2...\"
-              sudo npm install -g pm2
-              echo \"✅ PM2 installed successfully\"
-              
-              # Setup PM2 startup script
-              sudo pm2 startup
-            fi
-          '"
-
-          # Create and prepare deployment directory
-          echo "Preparing deployment directory..."
-          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash -c '
-            if [ ! -d \"${{ secrets.PRODUCTION_PATH }}\" ]; then
-              echo \"Creating deployment directory...\"
-              sudo mkdir -p ${{ secrets.PRODUCTION_PATH }}
-              echo \"✅ Deployment directory created\"
-            else
-              echo \"✅ Deployment directory already exists\"
-            fi
-
-            # Set correct ownership and permissions
-            sudo chown -R ${{ secrets.PRODUCTION_USER }}:${{ secrets.PRODUCTION_USER }} ${{ secrets.PRODUCTION_PATH }}
-            sudo chmod 755 ${{ secrets.PRODUCTION_PATH }}
-            echo \"✅ Directory permissions set correctly\"
-
-            # Create logs directory if it doesn't exist
-            if [ ! -d \"${{ secrets.PRODUCTION_PATH }}/logs\" ]; then
-              mkdir -p ${{ secrets.PRODUCTION_PATH }}/logs
-              echo \"✅ Logs directory created\"
-            fi
-          '"
+          # Create prepare directory script
+          echo "#!/bin/bash" > prepare_directory.sh
+          echo "DEPLOY_PATH=\"\$1\"" >> prepare_directory.sh
+          echo "" >> prepare_directory.sh
+          echo "if [ ! -d \"\${DEPLOY_PATH}\" ]; then" >> prepare_directory.sh
+          echo "  echo \"Creating deployment directory...\"" >> prepare_directory.sh
+          echo "  sudo mkdir -p \"\${DEPLOY_PATH}\"" >> prepare_directory.sh
+          echo "  echo \"✅ Deployment directory created\"" >> prepare_directory.sh
+          echo "else" >> prepare_directory.sh
+          echo "  echo \"✅ Deployment directory already exists\"" >> prepare_directory.sh
+          echo "fi" >> prepare_directory.sh
+          echo "" >> prepare_directory.sh
+          echo "# Set correct ownership and permissions" >> prepare_directory.sh
+          echo "sudo chown -R \$(whoami):\$(whoami) \"\${DEPLOY_PATH}\"" >> prepare_directory.sh
+          echo "sudo chmod 755 \"\${DEPLOY_PATH}\"" >> prepare_directory.sh
+          echo "echo \"✅ Directory permissions set correctly\"" >> prepare_directory.sh
+          echo "" >> prepare_directory.sh
+          echo "# Create logs directory if it doesn't exist" >> prepare_directory.sh
+          echo "if [ ! -d \"\${DEPLOY_PATH}/logs\" ]; then" >> prepare_directory.sh
+          echo "  mkdir -p \"\${DEPLOY_PATH}/logs\"" >> prepare_directory.sh
+          echo "  echo \"✅ Logs directory created\"" >> prepare_directory.sh
+          echo "fi" >> prepare_directory.sh
+          
+          chmod +x prepare_directory.sh
+          scp -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes prepare_directory.sh ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:/tmp/
+          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash /tmp/prepare_directory.sh '${{ secrets.PRODUCTION_PATH }}' && rm /tmp/prepare_directory.sh"
 
           # Create temporary archive
           tar -czf deploy.tar.gz \
