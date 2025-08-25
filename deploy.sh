@@ -149,6 +149,14 @@ check_pm2() {
 check_database() {
     print_info "Checking database connection..."
     
+    # Echo database configuration for debugging
+    print_info "Database configuration:"
+    echo "  DB_HOST=${DB_HOST}"
+    echo "  DB_PORT=${DB_PORT}"
+    echo "  DB_NAME=${DB_NAME}"
+    echo "  DB_USER=${DB_USER}"
+    echo "  DB_PASSWORD=${DB_PASSWORD}"
+    
     # First check if MySQL/MariaDB is accessible
     if check_service "MySQL/MariaDB" "$DB_HOST" "$DB_PORT"; then
         print_info "Testing database connection and checking if database exists..."
