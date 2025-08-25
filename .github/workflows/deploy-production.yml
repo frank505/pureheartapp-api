@@ -350,7 +350,7 @@ jobs:
             deploy.sh \
             ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
 
-          # Execute deployment on server
+          # Execute deployment on app server 
           echo "Executing deployment on server..."
           ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
             cd ${{ secrets.PRODUCTION_PATH }}
