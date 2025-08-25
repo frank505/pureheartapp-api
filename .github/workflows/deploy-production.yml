@@ -350,9 +350,9 @@ jobs:
             deploy.sh \
             ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
 
-          # Execute deployment on app server 
+          # Execute deployment on server 
           echo "Executing deployment on server..."
-          ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
+          ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
             cd ${{ secrets.PRODUCTION_PATH }}
             
             # Backup existing node_modules if it exists
@@ -375,7 +375,12 @@ jobs:
             
             # Make deploy script executable and run it
             chmod +x deploy.sh
-            ./deploy.sh '${{ secrets.PRODUCTION_PATH }}'
+            echo 'Starting deployment script...'
+            timeout 300 ./deploy.sh '${{ secrets.PRODUCTION_PATH }}'
+            
+            echo 'Deployment script completed'
+            echo 'Final PM2 status:'
+            pm2 list
           "
 
       - name: Cleanup

@@ -283,13 +283,34 @@ manage_pm2_process() {
     print_info "Managing PM2 process..."
     
     if pm2 list | grep -q "$app_name"; then
-        print_info "Reloading existing PM2 process..."
+        print_info "Stopping existing PM2 process..."
+        pm2 stop "$app_name"
+        sleep 2
+        
+        print_info "Reloading PM2 process..."
         pm2 reload "$app_name"
         print_status "PM2 process reloaded"
     else
         print_info "Starting new PM2 process..."
         pm2 start ecosystem.config.js --env production
         print_status "PM2 process started"
+    fi
+    
+    # Wait a moment for the process to initialize
+    sleep 3
+    
+    # Check if the process is running successfully
+    if pm2 list | grep -q "$app_name.*online"; then
+        print_status "PM2 process is running successfully"
+    else
+        print_error "PM2 process failed to start properly. Checking logs..."
+        print_info "Recent error logs:"
+        pm2 logs "$app_name" --lines 20 --err
+        
+        print_info "Recent output logs:"
+        pm2 logs "$app_name" --lines 10 --out
+        
+        return 1
     fi
     
     # Save PM2 process list
@@ -302,8 +323,22 @@ show_pm2_status() {
     print_info "Current PM2 processes:"
     pm2 list
     
-    print_info "PM2 logs (last 10 lines):"
-    pm2 logs --lines 10
+    print_info "PM2 logs (last 15 lines):"
+    pm2 logs --lines 15
+    
+    print_info "Application status check:"
+    local app_name="christian-recovery-app"
+    if pm2 list | grep -q "$app_name.*online"; then
+        print_status "Application is running successfully"
+        
+        # Show application-specific logs
+        print_info "Recent application logs:"
+        pm2 logs "$app_name" --lines 10
+    else
+        print_error "Application is not running properly"
+        print_info "Error logs:"
+        pm2 logs "$app_name" --lines 20 --err
+    fi
 }
 
 # Main deployment function
