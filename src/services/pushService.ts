@@ -9,7 +9,9 @@ export const initFirebaseIfNeeded = () => {
   const credsJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!credsJson) return; // allow running without push configured
   try {
-    const credentials = JSON.parse(credsJson);
+    // first convert from base64 to JSON
+    const buffer = Buffer.from(credsJson, 'base64');
+    const credentials = JSON.parse(buffer.toString('utf-8'));
     admin.initializeApp({ credential: admin.credential.cert(credentials) });
     initialized = true;
 // eslint-disable-next-line no-console
