@@ -271,11 +271,20 @@ jobs:
           ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash /tmp/prepare_directory.sh '${{ secrets.PRODUCTION_PATH }}' && rm /tmp/prepare_directory.sh"
 
           # Create temporary archive
+          echo "Creating deployment archive..."
           tar -czf deploy.tar.gz \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.env' \
             --exclude='deploy.tar.gz' \
+            --exclude='check_software.sh' \
+            --exclude='prepare_directory.sh' \
+            --exclude='.github' \
+            --exclude='*.log' \
+            --exclude='logs' \
+            --exclude='.DS_Store' \
+            --exclude='*.tmp' \
+            --exclude='*.temp' \
             .
 
           # Copy files to server
@@ -352,3 +361,5 @@ jobs:
           rm -f .env
           rm -f ~/.ssh/deploy_key
           rm -f deploy.tar.gz
+          rm -f check_software.sh
+          rm -f prepare_directory.sh
