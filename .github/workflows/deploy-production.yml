@@ -147,27 +147,36 @@ jobs:
 
       - name: Create deploy bundle (dist + assets)
         run: |
-          tar -czf deploy.tar.gz \
-            dist \
-            public \
-            src/1min_clips \
-            package.json \
-            package-lock.json \
-            ecosystem.config.js
+          set -euo pipefail
+          FILES=(package.json package-lock.json ecosystem.config.js)
+          [ -d dist ] && FILES+=("dist")
+          [ -d public ] && FILES+=("public")
+          [ -d src/1min_clips ] && FILES+=("src/1min_clips")
+          echo "Bundling: ${FILES[*]}"
+          tar -czf deploy.tar.gz "${FILES[@]}"
 
       - name: Push files to server
+        env:
+          SSH_HOST: ${{ secrets.PRODUCTION_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_USER }}
+          REMOTE_PATH: ${{ secrets.PRODUCTION_PATH }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "sudo mkdir -p ${{ secrets.PRODUCTION_PATH }} && sudo chown -R ${{ secrets.PRODUCTION_USER }}:${{ secrets.PRODUCTION_USER }} ${{ secrets.PRODUCTION_PATH }}"
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no .env.production ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/.env
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "sudo mkdir -p \"$REMOTE_PATH\" && sudo chown -R \"$SSH_USER:$SSH_USER\" \"$REMOTE_PATH\""
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz "$SSH_USER@$SSH_HOST":"$REMOTE_PATH"/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no .env.production "$SSH_USER@$SSH_HOST":"$REMOTE_PATH"/.env
 
       - name: Install and restart on server
         env:
+          SSH_HOST: ${{ secrets.PRODUCTION_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
+          PRODUCTION_PORT: ${{ secrets.PORT }}
           NODE_VERSION: ${{ vars.PRODUCTION_NODE_VERSION || '20' }}
+          FORCE_NODE_INSTALL: ${{ vars.FORCE_NODE_INSTALL || '0' }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOSSH'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "env NODE_VERSION=\"$NODE_VERSION\" FORCE_NODE_INSTALL=\"$FORCE_NODE_INSTALL\" PRODUCTION_PATH=\"$PRODUCTION_PATH\" PRODUCTION_PORT=\"$PRODUCTION_PORT\" bash -s" << 'EOSSH'
           set -euo pipefail
-          cd ${{ secrets.PRODUCTION_PATH }}
+          cd "${PRODUCTION_PATH}"
 
           # Extract bundle
           tar -xzf deploy.tar.gz && rm -f deploy.tar.gz
@@ -175,9 +184,26 @@ jobs:
           # Ensure logs dir for PM2
           mkdir -p logs
 
-          # Ensure Node.js is available (install if missing)
-          if ! command -v node >/dev/null 2>&1; then
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          # Ensure Node.js is available (install only if missing, avoid duplicates)
+          FORCE_NODE_INSTALL="${FORCE_NODE_INSTALL:-0}"
+          if command -v node >/dev/null 2>&1; then
+            CURRENT_VER=$(node -v | sed 's/^v//')
+            CURRENT_MAJOR=${CURRENT_VER%%.*}
+            DESIRED_MAJOR=${NODE_VERSION%%.*}
+            echo "Found Node.js v${CURRENT_VER} (major ${CURRENT_MAJOR}). Desired major: ${DESIRED_MAJOR}."
+            if [ "${FORCE_NODE_INSTALL}" = "1" ] && [ "${CURRENT_MAJOR}" != "${DESIRED_MAJOR}" ]; then
+              echo "FORCE_NODE_INSTALL=1 and major mismatch detected. Upgrading Node.js to ${NODE_VERSION}." 
+              curl -fsSL https://deb.nodesource.com/setup_${DESIRED_MAJOR}.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            else
+              if [ "${CURRENT_MAJOR}" != "${DESIRED_MAJOR}" ]; then
+                echo "Note: Node major ${CURRENT_MAJOR} != desired ${DESIRED_MAJOR}. Skipping install to avoid multiple versions. Set FORCE_NODE_INSTALL=1 to override."
+              fi
+            fi
+          else
+            echo "Node.js not found. Installing Node ${NODE_VERSION}."
+            DESIRED_MAJOR=${NODE_VERSION%%.*}
+            curl -fsSL https://deb.nodesource.com/setup_${DESIRED_MAJOR}.x | sudo -E bash -
             sudo apt-get install -y nodejs
           fi
 
@@ -200,7 +226,7 @@ jobs:
 
           # Quick health check
           sleep 2
-          curl -fsS http://127.0.0.1:${{ secrets.PORT }}/health || true
+          curl -fsS "http://127.0.0.1:${PRODUCTION_PORT}/health" || true
           EOSSH
 
       - name: Cleanup local
