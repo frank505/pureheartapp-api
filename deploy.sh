@@ -148,7 +148,93 @@ check_pm2() {
 # Check database connection
 check_database() {
     print_info "Checking database connection..."
-    check_service "MySQL/MariaDB" "$DB_HOST" "$DB_PORT"
+    
+    # First check if MySQL/MariaDB is accessible
+    if check_service "MySQL/MariaDB" "$DB_HOST" "$DB_PORT"; then
+        print_info "Testing database connection and checking if database exists..."
+        
+        # Check if mysql client is available
+        if command_exists mysql; then
+            # Test connection and check if database exists
+            MYSQL_CMD="mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER}"
+            
+            # Add password if provided
+            if [ -n "$DB_PASSWORD" ]; then
+                MYSQL_CMD="${MYSQL_CMD} -p${DB_PASSWORD}"
+            fi
+            
+            # Test basic connection
+            if echo "SELECT 1;" | $MYSQL_CMD 2>/dev/null; then
+                print_status "Database connection successful"
+                
+                # Check if the specified database exists
+                DB_EXISTS=$(echo "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME}';" | $MYSQL_CMD -N 2>/dev/null)
+                
+                if [ -n "$DB_EXISTS" ]; then
+                    print_status "Database '${DB_NAME}' exists"
+                else
+                    print_warning "Database '${DB_NAME}' does not exist, creating it..."
+                    
+                    # Create the database
+                    if echo "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" | $MYSQL_CMD 2>/dev/null; then
+                        print_status "Database '${DB_NAME}' created successfully"
+                        
+                        # Verify the database was created
+                        DB_EXISTS=$(echo "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME}';" | $MYSQL_CMD -N 2>/dev/null)
+                        if [ -n "$DB_EXISTS" ]; then
+                            print_status "Database creation verified"
+                        else
+                            print_error "Failed to verify database creation"
+                            return 1
+                        fi
+                    else
+                        print_error "Failed to create database '${DB_NAME}'"
+                        print_error "Please ensure the user '${DB_USER}' has CREATE privileges"
+                        return 1
+                    fi
+                fi
+                
+                # Test connection to the specific database
+                if echo "USE \`${DB_NAME}\`; SELECT 1;" | $MYSQL_CMD 2>/dev/null; then
+                    print_status "Successfully connected to database '${DB_NAME}'"
+                else
+                    print_error "Failed to connect to database '${DB_NAME}'"
+                    return 1
+                fi
+            else
+                print_error "Failed to connect to MySQL/MariaDB with provided credentials"
+                print_error "Please check DB_HOST, DB_PORT, DB_USER, and DB_PASSWORD"
+                return 1
+            fi
+        else
+            print_warning "MySQL client not available, installing..."
+            # Try to install mysql client
+            if command_exists apt-get; then
+                sudo apt-get update && sudo apt-get install -y mysql-client
+            elif command_exists yum; then
+                sudo yum install -y mysql
+            elif command_exists dnf; then
+                sudo dnf install -y mysql
+            else
+                print_error "Cannot install MySQL client automatically. Please install manually."
+                return 1
+            fi
+            
+            # Retry the check after installation
+            if command_exists mysql; then
+                print_status "MySQL client installed successfully"
+                # Recursively call this function to retry the check
+                check_database
+                return $?
+            else
+                print_error "Failed to install MySQL client"
+                return 1
+            fi
+        fi
+    else
+        print_error "Cannot connect to database server"
+        return 1
+    fi
 }
 
 # Check Redis connection
