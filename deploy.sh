@@ -149,15 +149,6 @@ check_pm2() {
 check_database() {
     print_info "Checking database connection..."
     
-    # Display database configuration for debugging
-    print_info "Database configuration:"
-    echo "  DB_HOST: ${DB_HOST}"
-    echo "  DB_PORT: ${DB_PORT}"
-    echo "  DB_NAME: ${DB_NAME}"
-    echo "  DB_USER: ${DB_USER}"
-    echo "  DB_PASSWORD: ${DB_PASSWORD:+[SET]} ${DB_PASSWORD:+([length: ${#DB_PASSWORD}])}"
-    echo ""
-    
     # First check if MySQL/MariaDB is accessible
     if check_service "MySQL/MariaDB" "$DB_HOST" "$DB_PORT"; then
         print_info "Testing database connection and checking if database exists..."
@@ -171,8 +162,6 @@ check_database() {
             if [ -n "$DB_PASSWORD" ]; then
                 MYSQL_CMD="${MYSQL_CMD} -p${DB_PASSWORD}"
             fi
-            
-            print_info "Using MySQL command: mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER} -p[HIDDEN]"
             
             # Test basic connection
             if echo "SELECT 1;" | $MYSQL_CMD 2>/dev/null; then
@@ -215,11 +204,6 @@ check_database() {
             else
                 print_error "Failed to connect to MySQL/MariaDB with provided credentials"
                 print_error "Please check DB_HOST, DB_PORT, DB_USER, and DB_PASSWORD"
-                
-                # Try to get more detailed error information
-                print_info "Attempting connection with error details..."
-                ERROR_OUTPUT=$(echo "SELECT 1;" | $MYSQL_CMD 2>&1)
-                print_error "MySQL error: $ERROR_OUTPUT"
                 return 1
             fi
         else
@@ -248,12 +232,7 @@ check_database() {
             fi
         fi
     else
-        print_error "Cannot connect to database server at ${DB_HOST}:${DB_PORT}"
-        print_info "Please verify:"
-        print_info "  1. MySQL/MariaDB server is running"
-        print_info "  2. Server is accessible from this host"
-        print_info "  3. Firewall allows connections on port ${DB_PORT}"
-        print_info "  4. DB_HOST and DB_PORT are correct"
+        print_error "Cannot connect to database server"
         return 1
     fi
 }
