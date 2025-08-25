@@ -270,90 +270,74 @@ jobs:
           scp -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes prepare_directory.sh ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:/tmp/
           ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash /tmp/prepare_directory.sh '${{ secrets.PRODUCTION_PATH }}' && rm /tmp/prepare_directory.sh"
 
-          # Create temporary archive
-          echo "Creating deployment archive..."
-          tar -czf deploy.tar.gz \
+      - name: Create deployment archive
+        run: |
+          # Create temporary directory for clean archiving
+          mkdir -p /tmp/deploy_staging
+          
+          # Copy project files to staging directory
+          rsync -av \
             --exclude='.git' \
             --exclude='node_modules' \
-            --exclude='.env' \
-            --exclude='deploy.tar.gz' \
-            --exclude='check_software.sh' \
-            --exclude='prepare_directory.sh' \
+            --exclude='.env*' \
             --exclude='.github' \
             --exclude='*.log' \
             --exclude='logs' \
             --exclude='.DS_Store' \
             --exclude='*.tmp' \
             --exclude='*.temp' \
-            .
+            --exclude='check_software.sh' \
+            --exclude='prepare_directory.sh' \
+            --exclude='/tmp/' \
+            . /tmp/deploy_staging/
+          
+          # Create archive from staging directory
+          cd /tmp/deploy_staging
+          tar -czf /tmp/deploy.tar.gz .
+          
+          # Move archive back to working directory
+          mv /tmp/deploy.tar.gz ./deploy.tar.gz
+          
+          # Cleanup staging directory
+          rm -rf /tmp/deploy_staging
+          
+          echo "✅ Deployment archive created successfully"
 
+      - name: Deploy to server
+        run: |
           # Copy files to server
           scp -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
             deploy.tar.gz \
             .env \
+            deploy.sh \
             ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
 
-          # Execute deployment commands on server
-          ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "bash -c '
+          # Execute deployment on server
+          ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
             cd ${{ secrets.PRODUCTION_PATH }}
             
             # Backup existing node_modules if it exists
-            if [ -d \"node_modules\" ]; then
-              echo \"Backing up node_modules...\"
+            if [ -d 'node_modules' ]; then
+              echo 'Backing up node_modules...'
               mv node_modules node_modules_backup
             fi
             
-            echo \"Extracting new files...\"
+            # Extract new files
+            echo 'Extracting deployment files...'
             tar xzf deploy.tar.gz
             rm deploy.tar.gz
             
-            # Restore node_modules if backup exists
-            if [ -d \"node_modules_backup\" ]; then
-              echo \"Restoring node_modules...\"
+            # Restore node_modules if backup exists  
+            if [ -d 'node_modules_backup' ]; then
+              echo 'Restoring node_modules...'
               rm -rf node_modules
               mv node_modules_backup node_modules
             fi
             
-            # Check if npm is available
-            if ! command -v npm &> /dev/null; then
-              echo \"❌ npm is not installed. Please install Node.js first.\"
-              exit 1
-            fi
-            
-            echo \"Installing dependencies...\"
-            npm install --production
-            
-            # Check if PM2 is available
-            if ! command -v pm2 &> /dev/null; then
-              echo \"❌ PM2 is not installed. Installing globally...\"
-              sudo npm install -g pm2
-              sudo pm2 startup
-            fi
-            
-            # Check if ecosystem.config.js exists
-            if [ ! -f \"ecosystem.config.js\" ]; then
-              echo \"❌ ecosystem.config.js not found!\"
-              exit 1
-            fi
-            
-            echo \"Managing PM2 process...\"
-            if pm2 list | grep -q \"christian-recovery-app\"; then
-              echo \"Reloading existing PM2 process...\"
-              pm2 reload christian-recovery-app
-            else
-              echo \"Starting new PM2 process...\"
-              pm2 start ecosystem.config.js --env production
-            fi
-            
-            # Save PM2 process list
-            pm2 save
-            
-            echo \"✅ Deployment completed successfully\"
-            
-            # Display running processes
-            echo \"Current PM2 processes:\"
-            pm2 list
-          '"
+            # Make deploy script executable and run it
+            chmod +x deploy.sh
+            ./deploy.sh '${{ secrets.PRODUCTION_PATH }}'
+          "
 
       - name: Cleanup
         if: always()
@@ -363,3 +347,4 @@ jobs:
           rm -f deploy.tar.gz
           rm -f check_software.sh
           rm -f prepare_directory.sh
+          rm -rf /tmp/deploy_staging
