@@ -272,9 +272,12 @@ jobs:
 
       - name: Create deployment archive
         run: |
+          echo "Creating deployment archive..."
+          
           # Create temporary directory for clean archiving
           mkdir -p /tmp/deploy_staging
           
+          echo "Copying project files to staging directory..."
           # Copy project files to staging directory
           rsync -av \
             --exclude='.git' \
@@ -291,21 +294,54 @@ jobs:
             --exclude='/tmp/' \
             . /tmp/deploy_staging/
           
+          echo "Files copied to staging. Contents:"
+          ls -la /tmp/deploy_staging/
+          
           # Create archive from staging directory
+          echo "Creating tar archive..."
           cd /tmp/deploy_staging
-          tar -czf /tmp/deploy.tar.gz .
+          tar -czf deploy.tar.gz .
+          
+          echo "Archive created. Size:"
+          ls -lh deploy.tar.gz
           
           # Move archive back to working directory
-          mv /tmp/deploy.tar.gz ./deploy.tar.gz
+          echo "Moving archive to working directory..."
+          mv deploy.tar.gz $GITHUB_WORKSPACE/deploy.tar.gz
           
           # Cleanup staging directory
           rm -rf /tmp/deploy_staging
+          
+          # Verify archive exists in working directory
+          echo "Verifying archive in working directory:"
+          ls -lh $GITHUB_WORKSPACE/deploy.tar.gz
           
           echo "✅ Deployment archive created successfully"
 
       - name: Deploy to server
         run: |
+          # Verify all required files exist before deployment
+          echo "Verifying deployment files..."
+          if [ ! -f "deploy.tar.gz" ]; then
+            echo "❌ deploy.tar.gz not found!"
+            exit 1
+          fi
+          
+          if [ ! -f ".env" ]; then
+            echo "❌ .env file not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "deploy.sh" ]; then
+            echo "❌ deploy.sh not found!"
+            exit 1
+          fi
+          
+          echo "✅ All deployment files verified"
+          ls -lh deploy.tar.gz .env deploy.sh
+          
           # Copy files to server
+          echo "Copying files to server..."
           scp -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
             deploy.tar.gz \
             .env \
@@ -313,6 +349,7 @@ jobs:
             ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:${{ secrets.PRODUCTION_PATH }}/
 
           # Execute deployment on server
+          echo "Executing deployment on server..."
           ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
             cd ${{ secrets.PRODUCTION_PATH }}
             
