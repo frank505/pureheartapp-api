@@ -58,10 +58,26 @@ check_environment() {
     # Source the .env file if it exists
     if [ -f ".env" ]; then
         print_info "Loading environment variables from .env file..."
-        # Export variables from .env file
-        set -a
-        source .env
-        set +a
+        
+        # Load .env file safely, ignoring comments and empty lines
+        while IFS='=' read -r key value; do
+            # Skip comments and empty lines
+            if [[ $key != \#* ]] && [ ! -z "$key" ]; then
+                # Remove any leading/trailing whitespace and quotes
+                key=$(echo "$key" | xargs)
+                value=$(echo "$value" | xargs)
+                
+                # Remove quotes if they exist
+                value="${value%\"}"
+                value="${value#\"}"
+                value="${value%\'}"
+                value="${value#\'}"
+                
+                # Export the variable
+                export "$key"="$value"
+            fi
+        done < .env
+        
         print_status ".env file loaded successfully"
     else
         print_warning ".env file not found, assuming environment variables are already set"
