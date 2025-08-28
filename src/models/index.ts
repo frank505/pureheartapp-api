@@ -37,6 +37,7 @@ import FastReminderLog from './FastReminderLog';
 import FastJournal from './FastJournal';
 import DeviceToken from './DeviceToken';
 import FastMessage from './FastMessage';
+import WaitingList from './WaitingList';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -242,6 +243,7 @@ export {
   FastJournal,
   DeviceToken,
   FastMessage,
+  WaitingList,
 };
 
 // Export a function to sync all models
@@ -285,4 +287,5 @@ export default {
   FastReminderLog,
   DeviceToken,
   FastMessage,
+  WaitingList,
 };

@@ -53,6 +53,7 @@ export const JOB_TYPES = {
     GROUP_INVITE: 'send-group-invite-email',
     ACCOUNTABILITY_INVITE: 'send-accountability-invite-email',
   FAST_STARTED: 'fast-started-email',
+  WAITING_LIST_THANK_YOU: 'waiting-list-thank-you-email',
   },
   NOTIFICATIONS: {
     PUSH_NOTIFICATION: 'send-push-notification',

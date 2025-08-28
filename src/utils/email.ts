@@ -33,6 +33,32 @@ export class EmailService implements IEmailService {
     this.transporter = createTransporter();
   }
 
+  async sendWaitingListThankYouEmail(email: string): Promise<boolean> {
+    try {
+      const subject = `${appConfig.name} - Thanks for joining the waiting list`;
+      const html = `
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${subject}</title></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; background: #f7f7f7; padding: 20px;">
+          <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;padding:20px;">
+            <h2 style="margin-top:0;">${appConfig.name}</h2>
+            <p>Thanks for signing up! You're on our waiting list. We'll notify you as soon as we're ready.</p>
+            <p>In the meantime, keep an eye on your inbox for updates.</p>
+            <p style="color:#666">Blessings,<br/>The ${appConfig.name} Team</p>
+          </div>
+        </body></html>
+      `;
+      const text = `Thanks for signing up! You're on our waiting list for ${appConfig.name}. We'll notify you as soon as we're ready.`;
+      const mailOptions = { from: emailConfig.from, to: email, subject, html, text } as any;
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('Waiting list thank you email sent:', result.messageId);
+      return true;
+    } catch (error) {
+      console.error('Error sending waiting list thank you email:', error);
+      return false;
+    }
+  }
+
   async sendFastStartedEmail(email: string, partnerName: string, fasterName: string): Promise<boolean> {
     try {
       const subject = `${appConfig.name} - ${fasterName} just started a fast`;

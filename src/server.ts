@@ -36,6 +36,7 @@ import widgetRoutes from './routes/widget';
 import { scheduleFastingCron, initializeFastingWorker } from './jobs/fastingJobs';
 import devicesRoutes from './routes/devices';
 import { initFirebaseIfNeeded } from './services/pushService';
+import waitingListRoutes from './routes/waitingList';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
@@ -316,6 +317,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(fastRoutes, { prefix: '/api' });
   await fastify.register(widgetRoutes, { prefix: '/api' });
   await fastify.register(devicesRoutes, { prefix: '/api' });
+  await fastify.register(waitingListRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {

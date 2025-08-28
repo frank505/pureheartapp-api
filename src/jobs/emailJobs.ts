@@ -54,6 +54,10 @@ export interface FastStartedEmailJobData {
   fasterName: string;
 }
 
+export interface WaitingListThankYouEmailJobData {
+  email: string;
+}
+
 /**
  * Union type for all email job data
  */
@@ -64,7 +68,8 @@ export type EmailJobData =
   | PasswordChangedNotificationJobData
   | GroupInviteEmailJobData
   | AccountabilityInviteEmailJobData
-  | FastStartedEmailJobData;
+  | FastStartedEmailJobData
+  | WaitingListThankYouEmailJobData;
 
 /**
  * Email job processor class
@@ -228,6 +233,24 @@ export class EmailJobProcessor {
       throw error;
     }
   }
+
+  /**
+   * Process waiting list thank you email job
+   */
+  async processWaitingListThankYouEmail(job: Job<WaitingListThankYouEmailJobData>): Promise<void> {
+    const { email } = job.data;
+    job.log(`Processing waiting list thank you email for ${email}`);
+    try {
+      const success = await this.emailService.sendWaitingListThankYouEmail(email);
+      if (!success) {
+        throw new Error('Failed to send waiting list thank you email');
+      }
+      job.log(`✅ Waiting list thank you email sent to ${email}`);
+    } catch (error) {
+      job.log(`❌ Failed to send waiting list thank you email to ${email}: ${error}`);
+      throw error;
+    }
+  }
 }
 
 /**
@@ -288,6 +311,9 @@ export class EmailWorker {
           break;
         case JOB_TYPES.EMAIL.FAST_STARTED:
           await this.processor.processFastStartedEmail(job as Job<FastStartedEmailJobData>);
+          break;
+        case JOB_TYPES.EMAIL.WAITING_LIST_THANK_YOU:
+          await this.processor.processWaitingListThankYouEmail(job as Job<WaitingListThankYouEmailJobData>);
           break;
 
         default:
@@ -492,6 +518,25 @@ export class EmailQueueService {
       JOB_TYPES.EMAIL.FAST_STARTED,
       { email, partnerName, fasterName },
       { priority, removeOnComplete: { count: 100 }, removeOnFail: { count: 50 } }
+    );
+  }
+
+  /** Add waiting list thank you email job (with optional delay) */
+  static async addWaitingListThankYouEmail(
+    email: string,
+    delayMs: number = 0,
+    priority: number = 5
+  ) {
+    const emailQueue = queueManager.getEmailQueue();
+    return emailQueue.add(
+      JOB_TYPES.EMAIL.WAITING_LIST_THANK_YOU,
+      { email },
+      {
+        priority,
+        delay: delayMs,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      }
     );
   }
 
