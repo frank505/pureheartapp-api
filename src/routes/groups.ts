@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Op, WhereOptions } from 'sequelize';
 import { authenticate, AuthenticatedFastifyRequest, optionalAuthenticate } from '../middleware/auth';
-import { Group, GroupInvite, GroupJoinRequest, GroupMember, Message, MessageAttachment, MessageRead, User } from '../models';
+import { Group, GroupInvite, GroupJoinRequest, GroupMember, Message, MessageAttachment, MessageRead, MessageComment, Like, User, UserProgress, UserBadge, Badge } from '../models';
 import { generateUniqueGroupInviteCode } from '../utils/invite';
 import { PushQueue } from '../jobs/notificationJobs';
 import Notification from '../models/Notification';
@@ -14,12 +14,37 @@ const parsePagination = (request: FastifyRequest) => {
   return { currentPage, pageSize, offset: (currentPage - 1) * pageSize };
 };
 
-const toUserRef = (user: User) => ({
-  id: user.id,
-  firstName: user.firstName,
-  lastName: user.lastName,
-  email: user.email,
-});
+const toUserRef = async (user: User) => {
+  // Get user's current streak
+  const userProgress = await UserProgress.findOne({ where: { userId: user.id } });
+  const currentStreak = userProgress?.currentCheckInStreak || 0;
+
+  // Get user's most recent badge
+  const mostRecentBadge = await UserBadge.findOne({
+    where: { userId: user.id },
+    include: [{ model: Badge, as: 'badge' }],
+    order: [['unlockedAt', 'DESC']],
+    limit: 1
+  });
+
+  const recentBadge = mostRecentBadge ? {
+    id: (mostRecentBadge as any).badge.id,
+    code: (mostRecentBadge as any).badge.code,
+    title: (mostRecentBadge as any).badge.title,
+    icon: (mostRecentBadge as any).badge.icon,
+    tier: (mostRecentBadge as any).badge.tier,
+    unlockedAt: mostRecentBadge.unlockedAt.toISOString()
+  } : null;
+
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    currentStreak,
+    mostRecentBadge: recentBadge
+  };
+};
 
 export default async function groupRoutes(fastify: FastifyInstance) {
   // Create group (supports initial invites via emails[] and optional inviteCode)
@@ -184,7 +209,13 @@ export default async function groupRoutes(fastify: FastifyInstance) {
       offset,
       order: [['createdAt', 'DESC']],
     } as any);
-    const items = rows.map((m: any) => ({ user: toUserRef(m.user), role: m.role, mutedUntil: m.mutedUntil ? m.mutedUntil.toISOString() : null, banned: m.banned, joinedAt: m.createdAt.toISOString() }));
+    const items = await Promise.all(rows.map(async (m: any) => ({ 
+      user: await toUserRef(m.user), 
+      role: m.role, 
+      mutedUntil: m.mutedUntil ? m.mutedUntil.toISOString() : null, 
+      banned: m.banned, 
+      joinedAt: m.createdAt.toISOString() 
+    })));
     return reply.send({ items, page: currentPage, totalPages: Math.ceil(count / pageSize) });
   });
 
@@ -415,7 +446,13 @@ export default async function groupRoutes(fastify: FastifyInstance) {
     if (!actor || (actor.role !== 'owner' && actor.role !== 'moderator')) return reply.status(403).send({ success: false, message: 'Forbidden', statusCode: 403 });
     const { currentPage, pageSize, offset } = parsePagination(request);
     const { rows, count } = await GroupJoinRequest.findAndCountAll({ where: { groupId: Number(id) }, include: [{ model: User, as: 'user' }], limit: pageSize, offset, order: [['createdAt', 'DESC']] } as any);
-    const items = rows.map((r: any) => ({ id: r.id, user: toUserRef(r.user), status: r.status, createdAt: r.createdAt.toISOString(), decidedAt: r.decidedAt ? r.decidedAt.toISOString() : undefined }));
+    const items = await Promise.all(rows.map(async (r: any) => ({ 
+      id: r.id, 
+      user: await toUserRef(r.user), 
+      status: r.status, 
+      createdAt: r.createdAt.toISOString(), 
+      decidedAt: r.decidedAt ? r.decidedAt.toISOString() : undefined 
+    })));
     return reply.send({ items, page: currentPage, totalPages: Math.ceil(count / pageSize) });
   });
 
@@ -477,12 +514,13 @@ export default async function groupRoutes(fastify: FastifyInstance) {
     const rows = await Message.findAll({ where, order: [['createdAt', 'DESC']], limit: pageSize, include: [] });
     const items = await Promise.all(rows.map(async (m) => {
       const attachments = await MessageAttachment.findAll({ where: { messageId: m.id } });
+      const likesCount = await Like.count({ where: { targetType: 'message', targetId: m.id } });
       let author: any;
       if (m.isAI || m.authorId == null) {
         author = { id: 'ai', name: 'AI' };
       } else {
         const u = await User.findByPk(m.authorId);
-        author = u ? toUserRef(u) : { id: 'ai', name: 'AI' };
+        author = u ? await toUserRef(u) : { id: 'ai', name: 'AI' };
       }
       return {
         id: m.id,
@@ -493,6 +531,7 @@ export default async function groupRoutes(fastify: FastifyInstance) {
         parentId: m.parentId || undefined,
         threadCount: m.threadCount || undefined,
         pinned: m.pinned,
+        likesCount,
         createdAt: m.createdAt.toISOString(),
         updatedAt: m.updatedAt.toISOString(),
         deletedAt: m.deletedAt ? m.deletedAt.toISOString() : undefined,
@@ -533,7 +572,7 @@ export default async function groupRoutes(fastify: FastifyInstance) {
     await PushQueue.sendGroupMessageNotification(pushPayload);
 
     const outAttachments = await MessageAttachment.findAll({ where: { messageId: msg.id } });
-    const author = toUserRef((await User.findByPk(userId))!);
+    const author = await toUserRef((await User.findByPk(userId))!);
     const response = {
       id: msg.id,
       groupId: msg.groupId,
@@ -543,6 +582,7 @@ export default async function groupRoutes(fastify: FastifyInstance) {
       parentId: msg.parentId || undefined,
       threadCount: msg.threadCount || undefined,
       pinned: msg.pinned,
+      likesCount: 0,
       createdAt: msg.createdAt.toISOString(),
       updatedAt: msg.updatedAt.toISOString(),
     };
@@ -568,8 +608,9 @@ export default async function groupRoutes(fastify: FastifyInstance) {
       for (const a of attachments) await MessageAttachment.create({ messageId: Number(messageId), type: (a.type as any), url: a.url, name: a.name || null });
     }
     const outAttachments = await MessageAttachment.findAll({ where: { messageId: Number(messageId) } });
-    const author = msg.isAI ? { id: 'ai', name: 'AI' } : toUserRef((await User.findByPk(msg.authorId!))!);
-    return reply.send({ id: msg.id, groupId: msg.groupId, author, text: msg.text ?? undefined, attachments: outAttachments.map(a => ({ id: a.id, type: a.type, url: a.url, name: a.name || undefined })), parentId: msg.parentId || undefined, threadCount: msg.threadCount || undefined, pinned: msg.pinned, createdAt: msg.createdAt.toISOString(), updatedAt: msg.updatedAt.toISOString() });
+    const likesCount = await Like.count({ where: { targetType: 'message', targetId: Number(messageId) } });
+    const author = msg.isAI ? { id: 'ai', name: 'AI' } : await toUserRef((await User.findByPk(msg.authorId!))!);
+    return reply.send({ id: msg.id, groupId: msg.groupId, author, text: msg.text ?? undefined, attachments: outAttachments.map(a => ({ id: a.id, type: a.type, url: a.url, name: a.name || undefined })), parentId: msg.parentId || undefined, threadCount: msg.threadCount || undefined, pinned: msg.pinned, likesCount, createdAt: msg.createdAt.toISOString(), updatedAt: msg.updatedAt.toISOString() });
   });
 
   // Delete message (soft)
@@ -582,6 +623,149 @@ export default async function groupRoutes(fastify: FastifyInstance) {
     if (!actor) return reply.status(403).send();
     if (msg.authorId !== userId && actor.role === 'member') return reply.status(403).send();
     await msg.destroy();
+    return reply.status(204).send();
+  });
+
+  // Get comments for a message
+  fastify.get('/groups/:id/messages/:messageId/comments', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id, messageId } = request.params as { id: string; messageId: string };
+    const { userId } = request as AuthenticatedFastifyRequest;
+    const { currentPage, pageSize, offset } = parsePagination(request);
+    
+    // Ensure member
+    const isMember = await GroupMember.findOne({ where: { groupId: Number(id), userId } });
+    if (!isMember) return reply.status(403).send({ success: false, message: 'Forbidden', statusCode: 403 });
+
+    // Ensure message exists
+    const message = await Message.findOne({ where: { id: Number(messageId), groupId: Number(id) } });
+    if (!message) return reply.status(404).send({ success: false, message: 'Message not found', statusCode: 404 });
+
+    const { rows, count } = await MessageComment.findAndCountAll({
+      where: { messageId: Number(messageId) },
+      limit: pageSize,
+      offset,
+      order: [['createdAt', 'ASC']],
+      include: [{ model: User, as: 'author' }]
+    });
+
+    const items = await Promise.all(rows.map(async (c) => {
+      const likesCount = await Like.count({ where: { targetType: 'comment', targetId: c.id } });
+      return {
+        id: c.id,
+        messageId: c.messageId,
+        author: await toUserRef((c as any).author),
+        body: c.body,
+        mentions: c.mentions || undefined,
+        attachments: c.attachments || undefined,
+        likesCount,
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: c.updatedAt.toISOString(),
+        deletedAt: c.deletedAt ? c.deletedAt.toISOString() : undefined,
+      };
+    }));
+
+    return reply.send({ items, page: currentPage, totalPages: Math.ceil(count / pageSize) });
+  });
+
+  // Create comment on a message
+  fastify.post('/groups/:id/messages/:messageId/comments', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id, messageId } = request.params as { id: string; messageId: string };
+    const { userId } = request as AuthenticatedFastifyRequest;
+    const { body, mentions, attachments } = request.body as { body: string; mentions?: number[]; attachments?: Array<{ type: string; url: string; name?: string }> };
+
+    // Ensure member
+    const isMember = await GroupMember.findOne({ where: { groupId: Number(id), userId } });
+    if (!isMember) return reply.status(403).send({ success: false, message: 'Forbidden', statusCode: 403 });
+
+    // Ensure message exists
+    const message = await Message.findOne({ where: { id: Number(messageId), groupId: Number(id) } });
+    if (!message) return reply.status(404).send({ success: false, message: 'Message not found', statusCode: 404 });
+
+    const comment = await MessageComment.create({
+      userId,
+      messageId: Number(messageId),
+      body,
+      mentions: mentions || null,
+      attachments: attachments || null,
+    });
+
+    const author = await User.findByPk(userId);
+    return reply.send({
+      id: comment.id,
+      messageId: comment.messageId,
+      author: await toUserRef(author!),
+      body: comment.body,
+      mentions: comment.mentions || undefined,
+      attachments: comment.attachments || undefined,
+      likesCount: 0,
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt.toISOString(),
+    });
+  });
+
+  // Like a message
+  fastify.post('/groups/:id/messages/:messageId/like', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id, messageId } = request.params as { id: string; messageId: string };
+    const { userId } = request as AuthenticatedFastifyRequest;
+
+    // Ensure member
+    const isMember = await GroupMember.findOne({ where: { groupId: Number(id), userId } });
+    if (!isMember) return reply.status(403).send({ success: false, message: 'Forbidden', statusCode: 403 });
+
+    // Ensure message exists
+    const message = await Message.findOne({ where: { id: Number(messageId), groupId: Number(id) } });
+    if (!message) return reply.status(404).send({ success: false, message: 'Message not found', statusCode: 404 });
+
+    // Check if already liked
+    const existing = await Like.findOne({ where: { userId, targetType: 'message', targetId: Number(messageId) } });
+    if (existing) return reply.status(409).send({ success: false, message: 'Already liked', statusCode: 409 });
+
+    await Like.create({ userId, targetType: 'message', targetId: Number(messageId) });
+    return reply.status(201).send({ success: true });
+  });
+
+  // Unlike a message
+  fastify.delete('/groups/:id/messages/:messageId/like', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id, messageId } = request.params as { id: string; messageId: string };
+    const { userId } = request as AuthenticatedFastifyRequest;
+
+    const like = await Like.findOne({ where: { userId, targetType: 'message', targetId: Number(messageId) } });
+    if (!like) return reply.status(404).send({ success: false, message: 'Like not found', statusCode: 404 });
+
+    await like.destroy();
+    return reply.status(204).send();
+  });
+
+  // Like a comment
+  fastify.post('/groups/:id/messages/:messageId/comments/:commentId/like', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id, messageId, commentId } = request.params as { id: string; messageId: string; commentId: string };
+    const { userId } = request as AuthenticatedFastifyRequest;
+
+    // Ensure member
+    const isMember = await GroupMember.findOne({ where: { groupId: Number(id), userId } });
+    if (!isMember) return reply.status(403).send({ success: false, message: 'Forbidden', statusCode: 403 });
+
+    // Ensure comment exists
+    const comment = await MessageComment.findOne({ where: { id: Number(commentId), messageId: Number(messageId) } });
+    if (!comment) return reply.status(404).send({ success: false, message: 'Comment not found', statusCode: 404 });
+
+    // Check if already liked
+    const existing = await Like.findOne({ where: { userId, targetType: 'comment', targetId: Number(commentId) } });
+    if (existing) return reply.status(409).send({ success: false, message: 'Already liked', statusCode: 409 });
+
+    await Like.create({ userId, targetType: 'comment', targetId: Number(commentId) });
+    return reply.status(201).send({ success: true });
+  });
+
+  // Unlike a comment
+  fastify.delete('/groups/:id/messages/:messageId/comments/:commentId/like', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id, messageId, commentId } = request.params as { id: string; messageId: string; commentId: string };
+    const { userId } = request as AuthenticatedFastifyRequest;
+
+    const like = await Like.findOne({ where: { userId, targetType: 'comment', targetId: Number(commentId) } });
+    if (!like) return reply.status(404).send({ success: false, message: 'Like not found', statusCode: 404 });
+
+    await like.destroy();
     return reply.status(204).send();
   });
 

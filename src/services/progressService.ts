@@ -21,7 +21,20 @@ export interface AnalyticsSummary {
 
 export const ensureUserProgress = async (userId: number): Promise<UserProgress> => {
   const existing = await UserProgress.findOne({ where: { userId } });
-  if (existing) return existing;
+  if (existing) {
+    // Decay existing streak if last check-in was more than 2 days ago
+    if (existing.lastCheckInDate) {
+      const now = new Date();
+      const last = new Date(existing.lastCheckInDate);
+      const diffTime = now.getTime() - last.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays >= 2) {
+        existing.currentCheckInStreak = 0;
+        await existing.save();
+      }
+    }
+    return existing;
+  }
   return UserProgress.create({ userId });
 };
 

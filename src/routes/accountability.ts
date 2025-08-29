@@ -1959,6 +1959,18 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           if (currentStreak > longestStreak) longestStreak = currentStreak;
         }
 
+        // Check if the current streak is still active (last check-in within last 2 days)
+        const now = new Date();
+        if (streakDates.length > 0) {
+          const lastStreakDate = new Date(streakDates[streakDates.length - 1]!);
+          const diffTime = now.getTime() - lastStreakDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays >= 2) {
+            currentStreak = 0;
+            streakDates = [];
+          }
+        }
+
         const response: IAPIResponse = {
           success: true,
           message: 'Streaks calculated successfully.',

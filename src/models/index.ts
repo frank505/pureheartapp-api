@@ -15,6 +15,8 @@ import GroupJoinRequest from './GroupJoinRequest';
 import Message from './Message';
 import MessageAttachment from './MessageAttachment';
 import MessageRead from './MessageRead';
+import MessageComment from './MessageComment';
+import Like from './Like';
 import GeneralSetting from './GeneralSetting';
 import Notification from './Notification';
 import AccountabilityCheckIn from './AccountabilityCheckIn';
@@ -221,6 +223,8 @@ export {
   Message,
   MessageAttachment,
   MessageRead,
+  MessageComment,
+  Like,
   GeneralSetting,
   Notification,
   AccountabilityCheckIn,
