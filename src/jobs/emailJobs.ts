@@ -4,6 +4,8 @@ import { EmailService } from '../utils/email';
 import { IEmailTemplateData } from '../types/auth';
 import { productionDetails } from '../config/environment';
 
+
+
 /**
  * Email job processors using BullMQ
  * This module handles all background email processing through Redis queues
