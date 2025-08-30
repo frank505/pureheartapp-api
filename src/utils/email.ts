@@ -3,6 +3,7 @@ import { emailConfig, appConfig } from '../config/environment';
 import { IEmailService, IEmailTemplateData } from '../types/auth';
 import { User } from '../models';
 import { Resend } from 'resend';
+import { Worker, Job } from 'bullmq';
 
 /**
  * Email service for sending authentication-related emails
@@ -81,13 +82,15 @@ export class EmailService implements IEmailService {
       return false;
     }
   }
-  
+
   async sendAccountabilityInviteEmail(
     email: string,
     inviterName: string,
-    inviteCode: string
+    inviteCode: string,
+    job?: Job
   ): Promise<boolean> {
     try {
+      job?.log(`email job is starting now ${email}`);
       const mailOptions = {
         from: emailConfig.from,
         to: email,
@@ -96,9 +99,11 @@ export class EmailService implements IEmailService {
         text: this.getAccountabilityInviteTextTemplate(inviterName, inviteCode),
       };
       const result = await this.transporter.emails.send(mailOptions);
+      job?.log(`Accountability invite email sent: ${result}`);
       console.log('Accountability invite email sent:', result);
       return true;
     } catch (error) {
+      job?.log(`Error sending accountability invite email: ${error}`);
       console.error('Error sending accountability invite email:', error);
       return false;
     }
