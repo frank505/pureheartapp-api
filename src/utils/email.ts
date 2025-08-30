@@ -98,8 +98,13 @@ export class EmailService implements IEmailService {
         html: this.getAccountabilityInviteTemplate(inviterName, inviteCode),
         text: this.getAccountabilityInviteTextTemplate(inviterName, inviteCode),
       };
+      job?.log(JSON.stringify({
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject
+      }));
       const result = await this.transporter.emails.send(mailOptions);
-      job?.log(`Accountability invite email sent: ${result}`);
+      job?.log(JSON.stringify(result));
       console.log('Accountability invite email sent:', result);
       return true;
     } catch (error) {
