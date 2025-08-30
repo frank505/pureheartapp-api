@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { AccountabilityPartner, InvitationClick, User } from '../models';
 import { PushQueue } from '../jobs/notificationJobs';
+import { EmailQueueService } from '../jobs/emailJobs';
 import { appConfig, securityConfig } from '../config/environment';
 import {
   IMatchInstallRequest,
@@ -130,13 +131,62 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         const emailService = new EmailService();
         const createdInvitations = await Promise.all(
           emails.map(async (email) => {
+            // Check if the email belongs to a user that already has an active partnership with the current user
+            const targetUser = await User.findOne({ where: { email } });
+            if (targetUser) {
+              // Check if there's already an active partnership between these users
+              const existingPartnership = await AccountabilityPartner.findOne({
+                where: {
+                  [Op.or]: [
+                    // Current user sent invite to target user (and it was accepted)
+                    {
+                      userId,
+                      receiverId: targetUser.id,
+                      usedAt: { [Op.not]: null }
+                    },
+                    // Target user sent invite to current user (and it was accepted)
+                    {
+                      userId: targetUser.id,
+                      receiverId: userId,
+                      usedAt: { [Op.not]: null }
+                    }
+                  ]
+                }
+              });
+
+              if (existingPartnership) {
+                throw new Error(`User with email ${email} is already your accountability partner`);
+              }
+
+              // Check if there's already a pending invitation to this user
+              const pendingInvitation = await AccountabilityPartner.findOne({
+                where: {
+                  userId,
+                  receiverId: null,
+                  usedAt: null
+                },
+                include: [
+                  {
+                    model: User,
+                    as: 'receiver',
+                    where: { email },
+                    required: false
+                  }
+                ]
+              });
+
+              if (pendingInvitation) {
+                throw new Error(`You already have a pending invitation to ${email}`);
+              }
+            }
+
             const invitationHash = hash || generateSecureToken();
             const invitation = await AccountabilityPartner.create({
               userId,
               hash: invitationHash,
               phoneNumber: phoneNumber || null,
-            });
-            await emailService.sendAccountabilityInviteEmail(
+            }); 
+            await EmailQueueService.addAccountabilityInviteEmailJob(
               email,
               `${invitingUser.firstName} ${invitingUser.lastName}`,
               invitationHash
@@ -420,6 +470,30 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         return reply.status(409).send({ success: false, message: 'Invitation already used' });
       }
 
+      // Check if there's already an active partnership between these users
+      const existingPartnership = await AccountabilityPartner.findOne({
+        where: {
+          [Op.or]: [
+            // Current user sent invite to invitation sender (and it was accepted)
+            {
+              userId,
+              receiverId: invitation.userId,
+              usedAt: { [Op.not]: null }
+            },
+            // Invitation sender sent invite to current user (and it was accepted)
+            {
+              userId: invitation.userId,
+              receiverId: userId,
+              usedAt: { [Op.not]: null }
+            }
+          ]
+        }
+      });
+
+      if (existingPartnership) {
+        return reply.status(409).send({ success: false, message: 'You already have an active partnership with this user' });
+      }
+
       // Enforce feature lock: multiple_accountability_partners if user already has one
       const { countAcceptedPartners, requireFeatureUnlocked } = await import('../services/featureService');
       const partnersCount = await countAcceptedPartners(userId);
@@ -494,6 +568,32 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         return reply
           .status(409)
           .send({ success: false, message: 'Invitation already used' });
+      }
+
+      // Check if there's already an active partnership between these users
+      const existingPartnership = await AccountabilityPartner.findOne({
+        where: {
+          [Op.or]: [
+            // Current user sent invite to invitation sender (and it was accepted)
+            {
+              userId,
+              receiverId: invitation.userId,
+              usedAt: { [Op.not]: null }
+            },
+            // Invitation sender sent invite to current user (and it was accepted)
+            {
+              userId: invitation.userId,
+              receiverId: userId,
+              usedAt: { [Op.not]: null }
+            }
+          ]
+        }
+      });
+
+      if (existingPartnership) {
+        return reply
+          .status(409)
+          .send({ success: false, message: 'You already have an active partnership with this user' });
       }
 
       // Enforce feature lock: multiple_accountability_partners if user already has one
