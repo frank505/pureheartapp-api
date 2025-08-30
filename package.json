@@ -48,6 +48,7 @@
     "mysql2": "^3.6.3",
     "node-cron": "^4.2.1",
     "nodemailer": "^6.9.7",
+    "resend": "^6.0.2",
     "sequelize": "^6.35.0",
     "uuid": "^9.0.1"
   },

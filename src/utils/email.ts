@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { emailConfig, appConfig } from '../config/environment';
 import { IEmailService, IEmailTemplateData } from '../types/auth';
 import { User } from '../models';
+import { Resend } from 'resend';
 
 /**
  * Email service for sending authentication-related emails
@@ -12,22 +13,15 @@ import { User } from '../models';
  * Create nodemailer transporter with configuration
  */
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: emailConfig.host,
-    port: emailConfig.port,
-    secure: emailConfig.secure,
-    auth: emailConfig.auth,
-    tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates in development
-    },
-  });
+  const resend = new Resend(emailConfig.auth.pass);
+  return resend;
 };
 
 /**
  * Email service implementation
  */
 export class EmailService implements IEmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: Resend;
 
   constructor() {
     this.transporter = createTransporter();
@@ -50,8 +44,10 @@ export class EmailService implements IEmailService {
       `;
       const text = `Thanks for signing up! You're on our waiting list for ${appConfig.name}. We'll notify you as soon as we're ready.`;
       const mailOptions = { from: emailConfig.from, to: email, subject, html, text } as any;
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Waiting list thank you email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+
+      // const result = await this.transporter.sendMail(mailOptions);
+      console.log('Waiting list thank you email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending waiting list thank you email:', error);
@@ -77,8 +73,8 @@ export class EmailService implements IEmailService {
       `;
       const text = `${fasterName} just started a fast and invited you to keep them accountable. Please keep them in prayer and send encouragement.\n\n- ${appConfig.name}`;
       const mailOptions = { from: emailConfig.from, to: email, subject, html, text } as any;
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Fast started email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Fast started email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending fast started email:', error);
@@ -99,8 +95,8 @@ export class EmailService implements IEmailService {
         html: this.getAccountabilityInviteTemplate(inviterName, inviteCode),
         text: this.getAccountabilityInviteTextTemplate(inviterName, inviteCode),
       };
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Accountability invite email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Accountability invite email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending accountability invite email:', error);
@@ -120,8 +116,8 @@ export class EmailService implements IEmailService {
         html: this.getGroupInviteTemplate(groupName, inviteCode),
         text: this.getGroupInviteTextTemplate(groupName, inviteCode),
       };
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Group invite email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Group invite email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending group invite email:', error);
@@ -150,8 +146,8 @@ export class EmailService implements IEmailService {
         text: this.getPasswordResetTextTemplate(resetUrl, userData),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Password reset email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Password reset email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending password reset email:', error);
@@ -180,8 +176,8 @@ export class EmailService implements IEmailService {
         text: this.getEmailVerificationTextTemplate(verificationUrl, userData),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Email verification email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Email verification email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending email verification email:', error);
@@ -208,8 +204,8 @@ export class EmailService implements IEmailService {
         text: this.getWelcomeTextTemplate(userData),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Welcome email sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Welcome email sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending welcome email:', error);
@@ -567,8 +563,8 @@ If you don't have the app yet, install it from the app store, create an account,
         text: this.getPasswordChangedTextTemplate(userData, timestamp, ipAddress, userAgent),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Password changed notification sent:', result.messageId);
+      const result = await this.transporter.emails.send(mailOptions);
+      console.log('Password changed notification sent:', result);
       return true;
     } catch (error) {
       console.error('Error sending password changed notification:', error);
@@ -679,19 +675,7 @@ Please do not reply to this email.
     `;
   }
 
-  /**
-   * Test email connection
-   */
-  async testConnection(): Promise<boolean> {
-    try {
-      await this.transporter.verify();
-      console.log('Email service connection verified');
-      return true;
-    } catch (error) {
-      console.error('Email service connection failed:', error);
-      return false;
-    }
-  }
+ 
 }
 
 // Create and export email service instance
