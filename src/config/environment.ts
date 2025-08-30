@@ -60,6 +60,8 @@ interface EnvironmentConfig {
 
   // Gemini for advanced query generation
   GEMINI_API_KEY: string;
+
+  PRODUCTION_PATH: string;
 }
 
 /**
@@ -94,7 +96,8 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     'PASSWORD_RESET_EXPIRES',
     'EMAIL_VERIFICATION_EXPIRES',
     'GOOGLE_CLIENT_ID',
-    'INVITE_MATCH_WINDOW_SECONDS'
+    'INVITE_MATCH_WINDOW_SECONDS',
+    'PRODUCTION_PATH',
   ];
 
   // Check for missing required environment variables
@@ -145,6 +148,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
 
     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || '',
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+    PRODUCTION_PATH: process.env.PRODUCTION_PATH!,
   };
 };
 
@@ -205,6 +209,20 @@ export const securityConfig = {
 
 export const googleConfig = {
   clientId: config.GOOGLE_CLIENT_ID,
+};
+
+export const productionDetails = {
+  path: config.PRODUCTION_PATH,
+  emailConfig:{
+    host: config.EMAIL_HOST,
+    port: config.EMAIL_PORT,
+    secure: config.EMAIL_SECURE,
+    auth: {
+      user: config.EMAIL_USER,
+      pass: config.EMAIL_PASS,
+    },
+    from: config.EMAIL_FROM,
+  }
 };
 
 export const youtubeConfig = {

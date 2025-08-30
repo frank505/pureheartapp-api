@@ -205,7 +205,7 @@ jobs:
           PASSWORD_RESET_EXPIRES=${{ secrets.PASSWORD_RESET_EXPIRES }}
           EMAIL_VERIFICATION_EXPIRES=${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
           INVITE_MATCH_WINDOW_SECONDS=${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
-
+          PRODUCTION_PATH=${{ secrets.PRODUCTION_PATH }}
           # Google and Firebase Configuration
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
