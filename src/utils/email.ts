@@ -105,7 +105,6 @@ export class EmailService implements IEmailService {
       }));
       const result = await this.transporter.emails.send(mailOptions);
       job?.log(JSON.stringify(result));
-      console.log('Accountability invite email sent:', result);
       return true;
     } catch (error) {
       job?.log(`Error sending accountability invite email: ${error}`);
