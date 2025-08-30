@@ -2,7 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { queueConnection, QUEUE_NAMES, JOB_TYPES, queueManager } from '../config/queue';
 import { EmailService } from '../utils/email';
 import { IEmailTemplateData } from '../types/auth';
-import { productionDetails } from '@/config/environment';
+import { productionDetails } from '../config/environment';
 
 /**
  * Email job processors using BullMQ
