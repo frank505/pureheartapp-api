@@ -284,12 +284,12 @@ manage_pm2_process() {
     
     if pm2 list | grep -q "$app_name"; then
         print_info "Stopping existing PM2 process..."
-        pm2 stop "$app_name"
+        pm2 delete "$app_name"
         sleep 2
         
-        print_info "Reloading PM2 process..."
-        pm2 reload "$app_name"
-        print_status "PM2 process reloaded"
+        print_info "Starting PM2 process with new environment..."
+        pm2 start ecosystem.config.js --env production --update-env
+        print_status "PM2 process started with updated environment"
     else
         print_info "Starting new PM2 process..."
         pm2 start ecosystem.config.js --env production
