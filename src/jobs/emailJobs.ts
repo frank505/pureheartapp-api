@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { queueConnection, QUEUE_NAMES, JOB_TYPES, queueManager } from '../config/queue';
 import { EmailService } from '../utils/email';
 import { IEmailTemplateData } from '../types/auth';
+import { productionDetails } from '@/config/environment';
 
 /**
  * Email job processors using BullMQ
@@ -204,6 +205,9 @@ export class EmailJobProcessor {
   async processAccountabilityInviteEmail(job: Job<AccountabilityInviteEmailJobData>): Promise<void> {
     const { email, inviterName, inviteCode } = job.data;
     job.log(`Processing accountability invite email for ${email} from ${inviterName}`);
+    job.log(JSON.stringify(
+      productionDetails
+    ));
     try {
       const success = await this.emailService.sendAccountabilityInviteEmail(email, inviterName, inviteCode, job);
       if (!success) {
