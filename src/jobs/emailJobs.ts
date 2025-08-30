@@ -205,11 +205,10 @@ export class EmailJobProcessor {
     const { email, inviterName, inviteCode } = job.data;
     job.log(`Processing accountability invite email for ${email} from ${inviterName}`);
     try {
-      const success = await this.emailService.sendAccountabilityInviteEmail(email, inviterName, inviteCode);
+      const success = await this.emailService.sendAccountabilityInviteEmail(email, inviterName, inviteCode, job);
       if (!success) {
         throw new Error('Failed to send accountability invite email');
       }
-      console.log(`✅ Accountability invite email sent successfully to ${email}`);
       job.log(`✅ Accountability invite email sent successfully to ${email}`);
     } catch (error) {
       job.log(`❌ Failed to send accountability invite email to ${email}: ${error}`);
