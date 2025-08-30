@@ -81,7 +81,7 @@ export class EmailService implements IEmailService {
       return false;
     }
   }
-
+  
   async sendAccountabilityInviteEmail(
     email: string,
     inviterName: string,
