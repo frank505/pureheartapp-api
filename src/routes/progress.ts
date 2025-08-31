@@ -150,9 +150,9 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       type FeatureKey = import('../services/featureService').FeatureKey;
       const FEATURE_KEYS: FeatureKey[] = [
         'victory_public_post',
-        'group_public_create',
+        'communities_public_create',
         'multiple_accountability_partners',
-        'create_multiple_public_groups',
+        'create_multiple_public_communities',
         'post_more_than_one_victory',
       ];
 
@@ -210,18 +210,18 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
     try {
       const userId = (request as AuthenticatedFastifyRequest).userId;
       const { hasFeatureUnlocked } = await import('../services/featureService');
-      const [victoryPublic, groupPublicCreate, multiPartners, multiPublicGroups, multiVictories] = await Promise.all([
+      const [victoryPublic, communitiesPublicCreate, multiPartners, multiPublicCommunities, multiVictories] = await Promise.all([
         hasFeatureUnlocked(userId, 'victory_public_post'),
-        hasFeatureUnlocked(userId, 'group_public_create'),
+        hasFeatureUnlocked(userId, 'communities_public_create'),
         hasFeatureUnlocked(userId, 'multiple_accountability_partners'),
-        hasFeatureUnlocked(userId, 'create_multiple_public_groups'),
+        hasFeatureUnlocked(userId, 'create_multiple_public_communities'),
         hasFeatureUnlocked(userId, 'post_more_than_one_victory'),
       ]);
       return reply.status(200).send({ success: true, message: 'Feature flags', data: {
         victory_public_post: victoryPublic,
-        group_public_create: groupPublicCreate,
+        communities_public_create: communitiesPublicCreate,
         multiple_accountability_partners: multiPartners,
-        create_multiple_public_groups: multiPublicGroups,
+        create_multiple_public_communities: multiPublicCommunities,
         post_more_than_one_victory: multiVictories,
       }, statusCode: 200 } satisfies IAPIResponse);
     } catch (error: any) {

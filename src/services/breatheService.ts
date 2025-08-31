@@ -270,9 +270,11 @@ function getAudioRootDir(): string {
     path.join(__dirname, '..', '1min_clips'), // src/1min_clips
     // Running compiled from dist/*
     path.join(__dirname, '..', 'src', '1min_clips'), // dist/../src/1min_clips
+    path.join(__dirname, '1min_clips'), // dist/1min_clips (after build)
     // Fallbacks relative to CWD
     path.join(process.cwd(), 'src', '1min_clips'),
     path.join(process.cwd(), '1min_clips'),
+    path.join(process.cwd(), 'dist', '1min_clips'),
   ];
   for (const p of candidates) {
     try {
@@ -315,7 +317,14 @@ function listAudioClips(): ClipInfo[] {
   }
   return files.map(fileName => {
     const name = path.basename(fileName, path.extname(fileName)).trim();
-    const url = `${appConfig.url.replace(/\/$/, '')}/audio/1min/${encodeURIComponent(fileName)}`;
+    // Construct URL using APP_URL for production to avoid exposing HOST
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.HOST || 'localhost';
+    const port = process.env.PORT || '3036';
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? (process.env.APP_URL || `${protocol}://${host}`)
+      : `${protocol}://${host}:${port}`;
+    const url = `${baseUrl}/audio/1min/${encodeURIComponent(fileName)}`;
     return { name, fileName, url, tags: parseTags(name) };
   });
 }

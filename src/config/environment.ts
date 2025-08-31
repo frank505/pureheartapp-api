@@ -41,6 +41,7 @@ interface EnvironmentConfig {
   // Application configuration
   APP_NAME: string;
   APP_URL: string;
+  API_URL: string;
   FRONTEND_URL: string;
   APP_STORE_URL: string;
 
@@ -90,6 +91,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     'EMAIL_FROM',
     'APP_NAME',
     'APP_URL',
+    'API_URL',
     'FRONTEND_URL',
     'APP_STORE_URL',
     'BCRYPT_ROUNDS',
@@ -135,6 +137,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     
     APP_NAME: process.env.APP_NAME!,
     APP_URL: process.env.APP_URL!,
+    API_URL: process.env.API_URL!,
     FRONTEND_URL: process.env.FRONTEND_URL!,
     APP_STORE_URL: process.env.APP_STORE_URL!,
 
@@ -196,6 +199,7 @@ export const emailConfig = {
 export const appConfig = {
   name: config.APP_NAME,
   url: config.APP_URL,
+  apiUrl: config.API_URL,
   frontendUrl: config.FRONTEND_URL,
   appStoreUrl: config.APP_STORE_URL,
 };

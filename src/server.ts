@@ -112,7 +112,7 @@ const createServer = async (): Promise<FastifyInstance> => {
 
   // Serve 1-minute ASMR clips
   await fastify.register(fastifyStatic, {
-    root: path.join(__dirname, '..', 'src', '1min_clips'),
+    root: path.join(__dirname, '1min_clips'),
     prefix: '/audio/1min/',
     decorateReply: false,
     serve: true,

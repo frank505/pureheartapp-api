@@ -98,6 +98,7 @@ jobs:
             # App settings
             "APP_NAME"
             "APP_URL"
+            "API_URL"
             "FRONTEND_URL"
             "APP_STORE_URL"
             "BCRYPT_ROUNDS"
@@ -197,6 +198,7 @@ jobs:
           # Application Configuration
           APP_NAME=${{ secrets.APP_NAME }}
           APP_URL=${{ secrets.APP_URL }}
+          API_URL=${{ secrets.API_URL }}
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           APP_STORE_URL=${{ secrets.APP_STORE_URL }}
           APP_STORE_URL_IOS=${{ secrets.APP_STORE_URL_IOS }}

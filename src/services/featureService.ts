@@ -6,16 +6,16 @@ import AccountabilityPartner from '../models/AccountabilityPartner';
 
 export type FeatureKey =
   | 'victory_public_post'
-  | 'group_public_create'
+  | 'communities_public_create'
   | 'multiple_accountability_partners'
-  | 'create_multiple_public_groups'
+  | 'create_multiple_public_communities'
   | 'post_more_than_one_victory';
 
 const THRESHOLDS: Record<FeatureKey, number> = {
   victory_public_post: 7,
-  group_public_create: 14,
+  communities_public_create: 14,
   multiple_accountability_partners: 21,
-  create_multiple_public_groups: 30,
+  create_multiple_public_communities: 30,
   post_more_than_one_victory: 90,
 };
 
@@ -39,7 +39,7 @@ export const requireFeatureUnlocked = async (userId: number, feature: FeatureKey
   }
 };
 
-export const countUserPublicGroupsOwned = async (userId: number): Promise<number> => {
+export const countUserPublicCommunitiesOwned = async (userId: number): Promise<number> => {
   return Group.count({ where: { ownerId: userId, privacy: 'public' } as any });
 };
 

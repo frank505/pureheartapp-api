@@ -86,6 +86,7 @@ check_environment() {
     local required_vars=(
         "NODE_ENV"
         "PORT"
+        "HOST"
         "DB_HOST"
         "DB_PORT"
         "DB_NAME"
@@ -93,6 +94,7 @@ check_environment() {
         "REDIS_HOST"
         "REDIS_PORT"
         "JWT_SECRET"
+        "API_URL"
     )
     
     local missing_vars=()

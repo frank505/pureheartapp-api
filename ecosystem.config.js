@@ -43,6 +43,7 @@ module.exports = {
       // Application Configuration
       APP_NAME: process.env.APP_NAME,
       APP_URL: process.env.APP_URL,
+      API_URL: process.env.API_URL,
       FRONTEND_URL: process.env.FRONTEND_URL,
       APP_STORE_URL: process.env.APP_STORE_URL,
       APP_STORE_URL_IOS: process.env.APP_STORE_URL_IOS,

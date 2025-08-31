@@ -58,11 +58,11 @@ export default async function groupRoutes(fastify: FastifyInstance) {
 
     // Feature gates for public groups
     if (privacy === 'public') {
-      const { requireFeatureUnlocked, countUserPublicGroupsOwned } = await import('../services/featureService');
-      await requireFeatureUnlocked(userId, 'group_public_create');
-      const count = await countUserPublicGroupsOwned(userId);
+      const { requireFeatureUnlocked, countUserPublicCommunitiesOwned } = await import('../services/featureService');
+      await requireFeatureUnlocked(userId, 'communities_public_create');
+      const count = await countUserPublicCommunitiesOwned(userId);
       if (count >= 1) {
-        await requireFeatureUnlocked(userId, 'create_multiple_public_groups');
+        await requireFeatureUnlocked(userId, 'create_multiple_public_communities');
       }
     }
 
