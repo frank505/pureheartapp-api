@@ -29,6 +29,17 @@ export const initializeFastingWorker = (): void => {
       });
       if (exists) return true;
       job.log(`Sending fasting reminder for fastId ${payload.fastId} to userId ${payload.userId}`);
+     const credsJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+     job?.log('checking for credentials');
+     
+     if(credsJson){
+       job?.log(credsJson);
+       const buffer = Buffer.from(credsJson, 'base64');
+       job?.log('converting credentials');
+    const credentials = JSON.parse(buffer.toString('utf-8'));
+    job?.log('firebase credentials: '+ JSON.stringify(credentials));
+     }
+      
       await Promise.all([
         Notification.create({
         userId: payload.userId,
