@@ -211,19 +211,7 @@ export const googleConfig = {
   clientId: config.GOOGLE_CLIENT_ID,
 };
 
-export const productionDetails = {
-  path: config.PRODUCTION_PATH,
-  emailConfig:{
-    host: config.EMAIL_HOST,
-    port: config.EMAIL_PORT,
-    secure: config.EMAIL_SECURE,
-    auth: {
-      user: config.EMAIL_USER,
-      pass: config.EMAIL_PASS,
-    },
-    from: config.EMAIL_FROM,
-  }
-};
+
 
 export const youtubeConfig = {
   apiKey: config.GOOGLE_API_KEY,

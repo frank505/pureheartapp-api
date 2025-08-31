@@ -23,28 +23,32 @@ export const initializeFastingWorker = (): void => {
     async (job) => {
       if (job.name !== JOB_TYPES.FASTING.SEND_PRAYER_REMINDER) return true;
       const payload = job.data as FastingReminderJobData;
-
       // Idempotency check
       const exists = await FastReminderLog.findOne({
         where: { fastId: payload.fastId, userId: payload.userId, dateKey: payload.dateKey, timeKey: payload.timeKey },
       });
       if (exists) return true;
-
-      await Notification.create({
+      job.log(`Sending fasting reminder for fastId ${payload.fastId} to userId ${payload.userId}`);
+      await Promise.all([
+        Notification.create({
         userId: payload.userId,
         type: 'generic',
         title: payload.title,
         body: payload.body,
         data: payload.data as any,
-      });
-      await sendPushToUser(payload.userId, { title: payload.title, body: payload.body, data: payload.data as any });
-      await FastReminderLog.create({
+      }),
+      sendPushToUser(payload.userId, 
+        { title: payload.title, body: payload.body, 
+          data: payload.data as any }, job),
+      FastReminderLog.create({
         fastId: payload.fastId,
         userId: payload.userId,
         dateKey: payload.dateKey,
         timeKey: payload.timeKey,
         sentAt: new Date(),
-      });
+      })    
+      ]);
+      
       return true;
     },
     { connection: queueConnection }
