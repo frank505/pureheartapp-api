@@ -59,6 +59,7 @@ jobs:
           # Additional app store URLs
           APP_STORE_URL_IOS: ${{ secrets.APP_STORE_URL_IOS }}
           APP_STORE_URL_ANDROID: ${{ secrets.APP_STORE_URL_ANDROID }}
+          API_URL: ${{ secrets.API_URL }}
         run: |
           MISSING_SECRETS=()
           
