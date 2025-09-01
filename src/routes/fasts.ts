@@ -114,12 +114,10 @@ export default async function fastRoutes(fastify: FastifyInstance) {
       daysOfWeek = value.schedule.frequency === 'weekly' ? (value.schedule.daysOfWeek as number[]) : null;
       windowStart = value.schedule.window.start;
       windowEnd = value.schedule.window.end;
-      // For recurring, set a long-running window; use now and +1 year
+      // For recurring, set a long-running window; use now and far future
       const now = new Date();
       start = now;
-      const oneYearLater = new Date(now.getTime());
-      oneYearLater.setUTCFullYear(now.getUTCFullYear() + 1);
-      end = oneYearLater;
+      end = new Date('2100-01-01T00:00:00Z');
     }
 
     // Validate
@@ -233,6 +231,24 @@ export default async function fastRoutes(fastify: FastifyInstance) {
     const percentage = totalHours > 0 ? Math.min(100, (elapsed / totalHours) * 100) : 0;
     const currentDurationISO = `PT${Math.floor(elapsed)}H${Math.floor((elapsed % 1) * 60)}M`;
 
+    let totalDays: number | string;
+    let dailyHours: number;
+    if (fast.scheduleKind === 'fixed') {
+      totalDays = Math.ceil(totalHours / 24);
+      dailyHours = totalHours;
+    } else {
+      totalDays = 'infinite';
+      if (fast.windowStart && fast.windowEnd) {
+        const start = new Date(`1970-01-01T${fast.windowStart}:00Z`);
+        const end = new Date(`1970-01-01T${fast.windowEnd}:00Z`);
+        let diff = (end.getTime() - start.getTime()) / 3600000;
+        if (diff < 0) diff += 24;
+        dailyHours = diff;
+      } else {
+        dailyHours = 24;
+      }
+    }
+
     const prayers = await FastPrayerLog.findAll({ where: { fastId } });
     const completedPrayers = Array.from(new Set(prayers.map(p => p.prayerTime).filter(Boolean))) as string[];
 
@@ -259,7 +275,9 @@ export default async function fastRoutes(fastify: FastifyInstance) {
         progress: {
           percentage,
           hoursCompleted: Math.round(elapsed * 10) / 10,
-          totalHours: Math.round(totalHours * 10) / 10,
+          totalHours: totalDays === 'infinite' ? null : Math.round(totalHours * 10) / 10,
+          totalDays,
+          dailyHours: Math.round(dailyHours * 10) / 10,
         },
   accountabilityPartner: null,
   recentJournals,
@@ -614,6 +632,23 @@ export default async function fastRoutes(fastify: FastifyInstance) {
       const totalHours = Math.max(0, (f.endTime.getTime() - f.startTime.getTime()) / 3600000);
       const elapsed = Math.max(0, Math.min(now.getTime(), f.endTime.getTime()) - f.startTime.getTime()) / 3600000;
       const percentage = totalHours > 0 ? Math.min(100, (elapsed / totalHours) * 100) : 0;
+      let totalDays: number | string;
+      let dailyHours: number;
+      if (f.scheduleKind === 'fixed') {
+        totalDays = Math.ceil(totalHours / 24);
+        dailyHours = totalHours;
+      } else {
+        totalDays = 'infinite';
+        if (f.windowStart && f.windowEnd) {
+          const start = new Date(`1970-01-01T${f.windowStart}:00Z`);
+          const end = new Date(`1970-01-01T${f.windowEnd}:00Z`);
+          let diff = (end.getTime() - start.getTime()) / 3600000;
+          if (diff < 0) diff += 24;
+          dailyHours = diff;
+        } else {
+          dailyHours = 24;
+        }
+      }
       const u = userMap.get(f.userId);
       return {
         fastId: f.id,
@@ -623,7 +658,9 @@ export default async function fastRoutes(fastify: FastifyInstance) {
         progress: {
           percentage,
           hoursCompleted: Math.round(elapsed * 10) / 10,
-          totalHours: Math.round(totalHours * 10) / 10,
+          totalHours: totalDays === 'infinite' ? null : Math.round(totalHours * 10) / 10,
+          totalDays,
+          dailyHours: Math.round(dailyHours * 10) / 10,
         },
         user: u
           ? {

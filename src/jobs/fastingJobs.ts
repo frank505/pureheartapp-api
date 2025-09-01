@@ -75,7 +75,7 @@ export const scheduleFastingCron = () => {
     // Update statuses concurrently
     await Promise.all([
       Fast.update({ status: 'active' } as any, { where: { status: 'upcoming', startTime: { [Op.lte]: now } } }),
-      Fast.update({ status: 'completed', completedAt: now } as any, { where: { status: 'active', endTime: { [Op.lte]: now } } }),
+      Fast.update({ status: 'completed', completedAt: now } as any, { where: { status: 'active', endTime: { [Op.lte]: now }, scheduleKind: 'fixed' } }),
     ]);
 
     // Fetch active fasts with reminders enabled
@@ -89,7 +89,7 @@ export const scheduleFastingCron = () => {
     const jobOpts: JobsOptions = DEFAULT_JOB_OPTIONS.fasting as any;
     const jobs: Promise<any>[] = [];
     for (const fast of actives) {
-      // If the fast has expired, finalize it and skip notifications (safety net in addition to the bulk update above)
+      // If the fixed fast has expired, finalize it and skip notifications (safety net in addition to the bulk update above)
       if (fast.scheduleKind === 'fixed' && now >= fast.endTime) {
         jobs.push(
           Fast.update(
@@ -98,15 +98,7 @@ export const scheduleFastingCron = () => {
           )
         );
         continue;
-      } else if (fast.scheduleKind === 'recurring' && now > fast.endTime) {
-        jobs.push(
-          Fast.update(
-            { status: 'completed', completedAt: now } as any,
-            { where: { id: fast.id, status: 'active' } }
-          )
-        );
-        continue; // recurring validity window exceeded
-      }
+      } 
 
       // Skip if outside fixed schedule window (but not expired)
       if (fast.scheduleKind === 'fixed') {
