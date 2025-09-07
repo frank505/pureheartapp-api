@@ -20,6 +20,7 @@ import sequelize from '../config/database';
 import Group from '../models/Group';
 import { IAuthenticatedRequest } from '../types/auth';
 import { recordCheckInAndUpdateStreak, incrementCounter, evaluateAndUnlockAchievements } from '../services/progressService';
+import { setFirstFlag } from '../services/userFirstsService';
 
 /**
  * Encapsulates the routes for accountability features.
@@ -422,6 +423,9 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           visibility,
           partnerIds: visibility === 'partner' ? partnerIds ?? null : null,
         });
+
+  // Mark first-time flag for making a prayer request
+  setFirstFlag(userId, 'hasMadeAPrayerRequest').catch(() => {});
 
         // Update progress and evaluate achievements
   await incrementCounter(userId, 'prayerCount');
@@ -1036,6 +1040,9 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           visibility,
           partnerIds: visibility === 'partner' ? partnerIds ?? null : null,
         });
+
+  // Mark first-time flag for sharing a victory
+  setFirstFlag(userId, 'hasSharedAVictory').catch(() => {});
 
         // Update progress and evaluate achievements
   await incrementCounter(userId, 'victoryCount');

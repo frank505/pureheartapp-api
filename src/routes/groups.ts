@@ -6,6 +6,7 @@ import { generateUniqueGroupInviteCode } from '../utils/invite';
 import { PushQueue } from '../jobs/notificationJobs';
 import Notification from '../models/Notification';
 import { IAPIResponse } from '../types/auth';
+import { setFirstFlag } from '../services/userFirstsService';
 
 const parsePagination = (request: FastifyRequest) => {
   const { page = '1', limit = '20' } = (request.query as any) || {};
@@ -72,6 +73,10 @@ export default async function groupRoutes(fastify: FastifyInstance) {
   (await import('../services/badgeService')).awardForGroupCreation(userId).catch(() => {});
     // Add owner as member
     await GroupMember.create({ groupId: created.id, userId, role: 'owner' });
+
+    if (privacy === 'private') {
+      setFirstFlag(userId, 'hasCreatedPrivateCommunity').catch(() => {});
+    }
 
     // Queue invite emails if provided
     if (Array.isArray(emails) && emails.length) {

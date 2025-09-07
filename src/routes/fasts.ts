@@ -12,6 +12,7 @@ import AccountabilityComment from '../models/AccountabilityComment';
 import { PushQueue } from '../jobs/notificationJobs';
 import User from '../models/User';
 import { EmailQueueService } from '../jobs/emailJobs';
+import { setFirstFlag } from '../services/userFirstsService';
 
 const fixedScheduleSchema = Joi.object({
   kind: Joi.string().valid('fixed').required(),
@@ -155,6 +156,9 @@ export default async function fastRoutes(fastify: FastifyInstance) {
       addAccountabilityPartners: value.addAccountabilityPartners ?? false,
     });
 
+  // Mark first-time flag for creating a fast
+  setFirstFlag(userId, 'hasCreatedFast').catch(() => {});
+
     // If user wants partner accountability, notify established partners (those with receiverId present)
     if (created.addAccountabilityPartners) {
       try {
@@ -214,7 +218,54 @@ export default async function fastRoutes(fastify: FastifyInstance) {
     }
 
     const { rows, count } = await Fast.findAndCountAll({ where, order: [['startTime', 'DESC']], limit, offset });
-    const response: IAPIResponse = { success: true, message: 'Fasts fetched', statusCode: 200, data: { items: rows, total: count, page, limit } };
+
+    const now = new Date();
+    const items = rows.map(f => {
+      const totalHours = Math.max(0, (f.endTime.getTime() - f.startTime.getTime()) / 3600000);
+      const elapsed = Math.max(0, Math.min(now.getTime(), f.endTime.getTime()) - f.startTime.getTime()) / 3600000;
+      const percentage = totalHours > 0 ? Math.min(100, (elapsed / totalHours) * 100) : 0;
+      let totalDays: number | string;
+      let dailyHours: number;
+      if (f.scheduleKind === 'fixed') {
+        totalDays = Math.ceil(totalHours / 24);
+        dailyHours = totalHours;
+      } else {
+        totalDays = 'infinite';
+        if (f.windowStart && f.windowEnd) {
+          const start = new Date(`1970-01-01T${f.windowStart}:00Z`);
+          const end = new Date(`1970-01-01T${f.windowEnd}:00Z`);
+          let diff = (end.getTime() - start.getTime()) / 3600000;
+          if (diff < 0) diff += 24;
+          dailyHours = diff;
+        } else {
+          dailyHours = 24;
+        }
+      }
+      return {
+        id: f.id,
+        type: f.type,
+        status: f.status,
+        goal: f.goal,
+        smartGoal: f.smartGoal,
+        startTime: f.startTime,
+        endTime: f.endTime,
+        prayerTimes: f.prayerTimes || [],
+        verse: f.verse,
+        prayerFocus: f.prayerFocus,
+        progress: {
+          percentage,
+          hoursCompleted: Math.round(elapsed * 10) / 10,
+          totalHours: totalDays === 'infinite' ? null : Math.round(totalHours * 10) / 10,
+          totalDays,
+          dailyHours: Math.round(dailyHours * 10) / 10,
+        },
+        reminderEnabled: f.reminderEnabled,
+        widgetEnabled: f.widgetEnabled,
+        addAccountabilityPartners: f.addAccountabilityPartners,
+      };
+    });
+
+    const response: IAPIResponse = { success: true, message: 'Fasts fetched', statusCode: 200, data: { items, total: count, page, limit } };
     return reply.status(200).send(response);
   });
 

@@ -24,6 +24,7 @@ import PrayerRequest from './PrayerRequest';
 import Victory from './Victory';
 import AccountabilityComment from './AccountabilityComment';
 import DailyRecommendation from './DailyRecommendation';
+import DailyReflection from './DailyReflection';
 import Achievement from './Achievement';
 import UserAchievement from './UserAchievement';
 import UserProgress from './UserProgress';
@@ -40,6 +41,7 @@ import FastJournal from './FastJournal';
 import DeviceToken from './DeviceToken';
 import FastMessage from './FastMessage';
 import WaitingList from './WaitingList';
+import UserFirsts from './UserFirsts';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -61,6 +63,10 @@ DailyRecommendation.belongsTo(User, {
   foreignKey: 'userId',
   as: 'recommendedUser',
 });
+
+// Reflections associations
+User.hasMany(DailyReflection, { foreignKey: 'userId', as: 'dailyReflections' });
+DailyReflection.belongsTo(User, { foreignKey: 'userId', as: 'reflectionUser' });
 
 // Fast associations
 User.hasMany(Fast, { foreignKey: 'userId', as: 'fasts' });
@@ -85,6 +91,10 @@ FastMessage.belongsTo(User, { foreignKey: 'recipientId', as: 'recipient' });
 // Device tokens
 User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
 DeviceToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// User firsts
+User.hasOne(UserFirsts, { foreignKey: 'userId', as: 'firsts' });
+UserFirsts.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // A user can send many accountability invitations
 User.hasMany(AccountabilityPartner, {
@@ -232,6 +242,7 @@ export {
   Victory,
   AccountabilityComment,
   DailyRecommendation,
+  DailyReflection,
   Achievement,
   UserAchievement,
   UserProgress,
@@ -248,6 +259,7 @@ export {
   DeviceToken,
   FastMessage,
   WaitingList,
+  UserFirsts,
 };
 
 // Export a function to sync all models
@@ -292,4 +304,6 @@ export default {
   DeviceToken,
   FastMessage,
   WaitingList,
+  DailyReflection,
+  UserFirsts,
 };

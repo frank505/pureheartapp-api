@@ -12,6 +12,7 @@ import { Op } from 'sequelize';
 import { authenticate, AuthenticatedFastifyRequest } from '../middleware/auth';
 import { EmailService } from '../utils/email';
 import { generateSecureToken } from '../utils/jwt';
+import { setFirstFlag } from '../services/userFirstsService';
 
 export default async function inviteRoutes(fastify: FastifyInstance) {
   fastify.get('/invite/:inviteId', async (request, reply) => {
@@ -523,6 +524,11 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       });
 
       const json = updated?.toJSON() as any;
+      // Mark first-time flag for both users when a partnership is established
+      if (updated?.receiverId && updated?.userId) {
+        setFirstFlag(updated.userId, 'hasAddedAPartner').catch(() => {});
+        setFirstFlag(updated.receiverId, 'hasAddedAPartner').catch(() => {});
+      }
       return reply.status(200).send({
         id: updated?.id,
         hash: updated?.hash,
@@ -623,6 +629,10 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       });
 
       const json = updated?.toJSON() as any;
+      if (updated?.receiverId && updated?.userId) {
+        setFirstFlag(updated.userId, 'hasAddedAPartner').catch(() => {});
+        setFirstFlag(updated.receiverId, 'hasAddedAPartner').catch(() => {});
+      }
       return reply.status(200).send({
         id: updated?.id,
         hash: updated?.hash,

@@ -29,7 +29,6 @@ WaitingList.init(
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true,
       validate: {
         isEmail: true,
         notEmpty: true,
@@ -58,9 +57,7 @@ WaitingList.init(
     timestamps: true,
     paranoid: true,
     underscored: true,
-    indexes: [
-      { unique: true, fields: ['email'] },
-    ],
+  // Note: unique index on email can be managed via a migration to avoid repeated ALTER during sync
   }
 );
 

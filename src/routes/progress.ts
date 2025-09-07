@@ -5,6 +5,8 @@ import AccountabilityCheckIn, { CheckInVisibility } from '../models/Accountabili
 import type { CheckInStatus } from '../models/AccountabilityCheckIn';
 import { Op } from 'sequelize';
 import { getAnalytics, getCalendarForMonth, getAchievementsForUser, evaluateAndUnlockAchievements, recordCheckInAndUpdateStreak } from '../services/progressService';
+import UserProgress from '../models/UserProgress';
+import User from '../models/User';
 import UserBadge from '../models/UserBadge';
 import Badge from '../models/Badge';
 import { PushQueue } from '../jobs/notificationJobs';
@@ -290,6 +292,42 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         return reply.status(200).send({ success: true, message: 'Calendar generated', data: result, statusCode: 200 } satisfies IAPIResponse);
       } catch (error: any) {
         return reply.status(500).send({ success: false, message: 'Failed to get calendar', error: error.message, statusCode: 500 } satisfies IAPIResponse);
+      }
+    }
+  );
+
+  // GET /progress/leaderboard/streaks?limit=50 — Top users by longest streak
+  fastify.get(
+    '/progress/leaderboard/streaks',
+    async (
+      request: FastifyRequest<{ Querystring: { limit?: number } }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const max = Number(request.query.limit) || 50;
+        const limit = Math.max(1, Math.min(50, max));
+        const rows = await UserProgress.findAll({
+          where: { longestCheckInStreak: { [Op.gt]: 0 } as any },
+          attributes: ['userId', 'longestCheckInStreak'],
+          order: [ ['longestCheckInStreak', 'DESC'], ['updatedAt', 'DESC'] ],
+          limit,
+        });
+
+        if (!rows.length) {
+          return reply.status(200).send({ success: true, message: 'No streaks yet', data: { items: [] }, statusCode: 200 });
+        }
+
+        const userIds = rows.map(r => r.userId);
+        const users = await User.findAll({ where: { id: userIds } as any, attributes: ['id', 'username'] });
+        const userMap = new Map(users.map(u => [u.id, u.username]));
+        const items = rows.map(r => ({
+          username: userMap.get(r.userId) || `user_${r.userId}`,
+          days: r.longestCheckInStreak,
+        }));
+
+        return reply.status(200).send({ success: true, message: 'Streak leaderboard', data: { items }, statusCode: 200 });
+      } catch (error: any) {
+        return reply.status(500).send({ success: false, message: 'Failed to get streak leaderboard', error: error.message, statusCode: 500 });
       }
     }
   );

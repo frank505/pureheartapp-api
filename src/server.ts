@@ -24,6 +24,7 @@ import notificationsRoutes from './routes/notifications';
 import accountabilityRoutes from './routes/accountability';
 import recommendationsRoutes from './routes/recommendations';
 import { initializeRecommendationWorker, scheduleDailyRecommendations } from './jobs/recommendationJobs';
+import { initializeReflectionWorker, scheduleWeeklyReflections } from './jobs/reflectionJobs';
 import { initializeTruthLiesWorker, closeTruthLiesWorker } from './jobs/truthLiesJobs';
 import progressRoutes from './routes/progress';
 import truthLiesRoutes from './routes/truthLies';
@@ -37,6 +38,8 @@ import { scheduleFastingCron, initializeFastingWorker } from './jobs/fastingJobs
 import devicesRoutes from './routes/devices';
 import { initFirebaseIfNeeded } from './services/pushService';
 import waitingListRoutes from './routes/waitingList';
+import reflectionsRoutes from './routes/reflections';
+import userFirstsRoutes from './routes/userFirsts';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
@@ -129,6 +132,7 @@ const createServer = async (): Promise<FastifyInstance> => {
     Promise.resolve().then(() => initializeEmailWorker()),
     Promise.resolve().then(() => initializeNotificationWorker()),
     Promise.resolve().then(() => initializeRecommendationWorker()),
+  Promise.resolve().then(() => initializeReflectionWorker()),
     Promise.resolve().then(() => initializeTruthLiesWorker()),
     Promise.resolve().then(() => initFirebaseIfNeeded()),
     Promise.resolve().then(() => initializeFastingWorker()),
@@ -137,6 +141,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   // Schedule recurring jobs in parallel
   await Promise.allSettled([
     Promise.resolve().then(() => scheduleDailyRecommendations()),
+  Promise.resolve().then(() => scheduleWeeklyReflections()),
     Promise.resolve().then(() => scheduleFastingCron()),
   ]);
 
@@ -318,6 +323,8 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(widgetRoutes, { prefix: '/api' });
   await fastify.register(devicesRoutes, { prefix: '/api' });
   await fastify.register(waitingListRoutes, { prefix: '/api' });
+  await fastify.register(reflectionsRoutes, { prefix: '/api' });
+  await fastify.register(userFirstsRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
@@ -378,7 +385,8 @@ const startServer = async (): Promise<void> => {
     
     // In development, you might want to use `alter: true` to avoid losing data
     // In production, you'll likely want to use a migration tool instead.
-    await syncAllModels(false, true);
+  // Avoid auto-altering schema in dev to prevent repeated index churn
+  await syncAllModels(false, false);
     // Initialize default general settings
     await initializeGeneralSettings();
     // Seed default achievements
