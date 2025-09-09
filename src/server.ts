@@ -40,6 +40,7 @@ import { initFirebaseIfNeeded } from './services/pushService';
 import waitingListRoutes from './routes/waitingList';
 import reflectionsRoutes from './routes/reflections';
 import userFirstsRoutes from './routes/userFirsts';
+import panicRoutes from './routes/panic';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
@@ -54,6 +55,8 @@ import './models/FastProgressLog';
 import './models/FastReminderLog';
 import './models/FastJournal';
 import './models/FastMessage';
+import './models/Panic';
+import './models/PanicReply';
 
 /**
  * Create and configure Fastify server instance
@@ -325,6 +328,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(waitingListRoutes, { prefix: '/api' });
   await fastify.register(reflectionsRoutes, { prefix: '/api' });
   await fastify.register(userFirstsRoutes, { prefix: '/api' });
+  await fastify.register(panicRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {

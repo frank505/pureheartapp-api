@@ -16,6 +16,8 @@ export interface PushPayload {
     | 'checkin_commented'
     | 'prayer_request_commented'
     | 'victory_commented'
+  | 'panic_created'
+  | 'panic_replied'
     | 'generic';
   groupId?: string;
   messageId?: string;
@@ -56,7 +58,9 @@ export const initializeNotificationWorker = (): void => {
             payload.type === 'victory_created' ||
             payload.type === 'checkin_commented' ||
             payload.type === 'prayer_request_commented' ||
-            payload.type === 'victory_commented') &&
+            payload.type === 'victory_commented' ||
+            payload.type === 'panic_created' ||
+            payload.type === 'panic_replied') &&
           payload.targetUserId
         ) {
           await Notification.create({

@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authenticate, AuthenticatedFastifyRequest } from '../middleware/auth';
 import DailyReflection from '../models/DailyReflection';
+import { enqueueGenerateWeeklyReflections } from '../jobs/reflectionJobs';
 
 export default async function reflectionsRoutes(fastify: FastifyInstance) {
   fastify.get('/reflections/today', { preHandler: [authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -14,7 +15,20 @@ export default async function reflectionsRoutes(fastify: FastifyInstance) {
     const localDate = `${yyyy}-${mm}-${dd}`;
 
     const items = await DailyReflection.findAll({ where: { userId, displayDate: localDate }, order: [['orderInDay', 'ASC']] });
-    if (!items.length) return reply.status(404).send({ success: false, message: 'No reflections scheduled for today', statusCode: 404 });
+    if (!items.length) {
+      // If none exist for today, enqueue job to generate the next 7 days starting today
+      try {
+        await enqueueGenerateWeeklyReflections({ userId, timezone: tz, startDate: localDate });
+      } catch (err) {
+        request.log.error({ err }, 'Failed to enqueue weekly reflections generation');
+      }
+      return {
+        success: true,
+        message: 'No reflections scheduled for today. Generation has been scheduled.',
+        statusCode: 200,
+        data: []
+      };
+    }
 
     return reply.send({
       success: true,

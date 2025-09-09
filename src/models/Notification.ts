@@ -12,6 +12,8 @@ export type NotificationType =
   | 'checkin_commented'
   | 'prayer_request_commented'
   | 'victory_commented'
+  | 'panic_created'
+  | 'panic_replied'
   | 'generic';
 
 export interface INotification {

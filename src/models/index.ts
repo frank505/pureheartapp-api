@@ -42,6 +42,8 @@ import DeviceToken from './DeviceToken';
 import FastMessage from './FastMessage';
 import WaitingList from './WaitingList';
 import UserFirsts from './UserFirsts';
+import Panic from './Panic';
+import PanicReply from './PanicReply';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -95,6 +97,13 @@ DeviceToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 // User firsts
 User.hasOne(UserFirsts, { foreignKey: 'userId', as: 'firsts' });
 UserFirsts.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// Panic associations
+User.hasMany(Panic, { foreignKey: 'userId', as: 'panics' });
+Panic.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Panic.hasMany(PanicReply, { foreignKey: 'panicId', as: 'replies' });
+PanicReply.belongsTo(Panic, { foreignKey: 'panicId', as: 'panic' });
+PanicReply.belongsTo(User, { foreignKey: 'userId', as: 'replier' });
 
 // A user can send many accountability invitations
 User.hasMany(AccountabilityPartner, {
@@ -260,6 +269,8 @@ export {
   FastMessage,
   WaitingList,
   UserFirsts,
+  Panic,
+  PanicReply,
 };
 
 // Export a function to sync all models
@@ -306,4 +317,6 @@ export default {
   WaitingList,
   DailyReflection,
   UserFirsts,
+  Panic,
+  PanicReply,
 };
