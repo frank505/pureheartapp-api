@@ -41,6 +41,7 @@ import waitingListRoutes from './routes/waitingList';
 import reflectionsRoutes from './routes/reflections';
 import userFirstsRoutes from './routes/userFirsts';
 import panicRoutes from './routes/panic';
+import dependencyRoutes from './routes/dependency';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
@@ -329,6 +330,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(reflectionsRoutes, { prefix: '/api' });
   await fastify.register(userFirstsRoutes, { prefix: '/api' });
   await fastify.register(panicRoutes, { prefix: '/api' });
+  await fastify.register(dependencyRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
