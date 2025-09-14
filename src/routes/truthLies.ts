@@ -6,6 +6,7 @@ import {
   deleteTruthEntry,
   generateResponseToLie 
 } from '../services/truthLiesService';
+import { requireLLMAccess, paywallResponse } from '../services/accessControlService';
 import { authenticate } from '../middleware/auth';
 
 interface CreateTruthEntryBody {
@@ -169,6 +170,11 @@ export default async function truthLiesRoutes(fastify: FastifyInstance) {
     preHandler: [authenticate],
     handler: async (request: FastifyRequest<{ Body: GenerateResponseBody }>, reply: FastifyReply) => {
       try {
+        const userId = (request as any).userId as number;
+        const access = await requireLLMAccess(userId, 'lie_response');
+        if (!access.allowed) {
+          return reply.status(402).send(paywallResponse('lie_response', access.trialEndsAt));
+        }
         const response = await generateResponseToLie(request.body.lie);
         
         return reply.send({

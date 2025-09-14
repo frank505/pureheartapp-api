@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/auth';
 import AIChatSession from '../models/AIChatSession';
 import AIChatMessage from '../models/AIChatMessage';
 import { AIChatService } from '../services/aiChatService';
+import { requireLLMAccess, paywallResponse } from '../services/accessControlService';
 
 interface PaginatedQuery { page?: string; limit?: string; }
 const parsePagination = (request: FastifyRequest) => {
@@ -107,6 +108,11 @@ export default async function aiChatRoutes(fastify: FastifyInstance) {
     const recent = await AIChatMessage.findAll({ where: { sessionId: session.id }, order: [['createdAt', 'ASC']], limit: 20 });
     const history = recent.map((m) => ({ role: m.role as 'user'|'assistant'|'system', content: m.content }));
 
+    // Access control
+    const access = await requireLLMAccess(userId, 'ai_chat');
+    if (!access.allowed) {
+      return reply.status(402).send(paywallResponse('ai_chat', access.trialEndsAt));
+    }
     // Generate AI reply
     const ai = await AIChatService.generateReply(userId, message, history);
 
@@ -138,7 +144,7 @@ export default async function aiChatRoutes(fastify: FastifyInstance) {
     }
     lastCall.set(userId, now);
 
-    let session: AIChatSession | null = null;
+  let session: AIChatSession | null = null;
     if (sessionId) {
       session = await AIChatSession.findOne({ where: { id: sessionId, userId } });
       if (!session) return reply.status(404).send({ success: false, message: 'Session not found', statusCode: 404 });
@@ -148,6 +154,12 @@ export default async function aiChatRoutes(fastify: FastifyInstance) {
     }
 
     await AIChatMessage.create({ sessionId: session.id, role: 'user', content: message });
+    const access = await requireLLMAccess(userId, 'ai_chat');
+    if (!access.allowed) {
+      // Immediately finish SSE with paywall event
+      reply.header('Content-Type', 'application/json');
+      return reply.status(402).send(paywallResponse('ai_chat', access.trialEndsAt));
+    }
     const recent = await AIChatMessage.findAll({ where: { sessionId: session.id }, order: [['createdAt', 'ASC']], limit: 20 });
     const history = recent.map((m) => ({ role: m.role as 'user'|'assistant'|'system', content: m.content }));
 

@@ -4,6 +4,7 @@ import { OnboardingState } from '../types/auth';
 import TruthLies from '../models/TruthLies';
 import OnboardingData from '../models/OnboardingData';
 import { cleanGeminiResponse } from '../utils/gemini';
+import { requireLLMAccess } from './accessControlService';
 
 // Initialize Google AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
@@ -111,9 +112,15 @@ export async function generateTruthLiesFromOnboarding(
     }
 
     // Generate lies based on onboarding data or use defaults
-    const truthLies = userOnboarding 
-      ? await generatePersonalizedLies(userOnboarding)
-      : commonAddictionLies;
+    let truthLies: TruthLieResponse[] = commonAddictionLies;
+    if (userOnboarding) {
+      const access = await requireLLMAccess(userId, 'truthlies_regen');
+      if (access.allowed) {
+        truthLies = await generatePersonalizedLies(userOnboarding);
+      } else {
+        // remain default list
+      }
+    }
 
     // Store the generated lies
     await Promise.all(

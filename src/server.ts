@@ -42,6 +42,10 @@ import reflectionsRoutes from './routes/reflections';
 import userFirstsRoutes from './routes/userFirsts';
 import panicRoutes from './routes/panic';
 import dependencyRoutes from './routes/dependency';
+import articlesRoutes from './routes/articles';
+import revenuecatRoutes from './routes/revenuecat';
+import ARTICLES from './data/articles';
+import Article from './models/Article';
 // Ensure new models are registered before syncing
 import './models/UserAchievement';
 import './models/UserProgress';
@@ -107,6 +111,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(jwt, {
     secret: jwtConfig.secret,
   });
+
 
   // Register Redis plugin
   await fastify.register(redis, getRedisOptions());
@@ -331,6 +336,8 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(userFirstsRoutes, { prefix: '/api' });
   await fastify.register(panicRoutes, { prefix: '/api' });
   await fastify.register(dependencyRoutes, { prefix: '/api' });
+  await fastify.register(articlesRoutes, { prefix: '/api' });
+  await fastify.register(revenuecatRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
@@ -399,6 +406,27 @@ const startServer = async (): Promise<void> => {
     await initializeDefaultAchievements();
   // Seed default badges
   await initializeDefaultBadges();
+    // Auto-seed articles if missing (idempotent append-only)
+    try {
+      const existingCount = await Article.count();
+      if (existingCount < ARTICLES.length) {
+        const toInsert = ARTICLES.slice(existingCount).map(a => ({
+          slug: a.slug,
+          title: a.title,
+          summary: a.summary ?? null,
+          content: a.content,
+          references: a.references ?? null,
+          tags: a.tags ?? null,
+          category: a.category ?? null,
+        }));
+        if (toInsert.length) {
+          await Article.bulkCreate(toInsert, { validate: true });
+          console.log(`Seeded ${toInsert.length} article(s). Total now ${existingCount + toInsert.length}.`);
+        }
+      }
+    } catch (seedErr) {
+      console.error('Article auto-seed failed:', seedErr);
+    }
     
     // Create and start the server
     const fastify = await createServer();

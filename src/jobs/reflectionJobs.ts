@@ -53,9 +53,10 @@ const buildFiveReflections = async (args: {
   timezone: string;
   displayDate: string;
   preferredVersion?: string | null;
+  allowAI: boolean;
 }): Promise<ReflectionUnit[]> => {
   const preferredVersion = normalizeVersion(args.preferredVersion);
-  if (!geminiConfig.apiKey) {
+  if (!geminiConfig.apiKey || !args.allowAI) {
     // Simple fallback: 1 main scripture + 4 prompts based on prayer titles
     const ref = selectDailyReference(args.timezone);
     const passage = await fetchPassage(ref, preferredVersion);
@@ -117,10 +118,19 @@ export const initializeReflectionWorker = () => {
   return worker;
 };
 
+import { requireLLMAccess } from '../services/accessControlService';
+
 export const runGenerateWeeklyReflections = async ({ userId, timezone, startDate }: GenerateWeeklyReflectionsJob) => {
   const onboarding = await OnboardingData.findOne({ where: { userId } });
   const prayerRequests = await getAccessiblePrayerRequests(userId);
   const preferredVersion = (onboarding as any)?.faithData?.bibleVersion ?? null;
+
+  // Determine AI access once
+  let allowAI = false;
+  try {
+    const access = await requireLLMAccess(userId, 'reflections_generation');
+    allowAI = access.allowed;
+  } catch {}
 
   // 7 days, 5 reflections per day
   for (let day = 0; day < 7; day++) {
@@ -132,7 +142,7 @@ export const runGenerateWeeklyReflections = async ({ userId, timezone, startDate
     const existing = await DailyReflection.count({ where: { userId, displayDate } });
     if (existing >= 5) continue;
 
-    const reflections = await buildFiveReflections({ onboarding, prayerRequests, timezone, displayDate, preferredVersion });
+  const reflections = await buildFiveReflections({ onboarding, prayerRequests, timezone, displayDate, preferredVersion, allowAI });
   const toCreate = reflections.map((r, idx) => ({
       userId,
       displayDate,

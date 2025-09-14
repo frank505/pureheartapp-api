@@ -44,6 +44,8 @@ import WaitingList from './WaitingList';
 import UserFirsts from './UserFirsts';
 import Panic from './Panic';
 import PanicReply from './PanicReply';
+import Article from './Article';
+import Subscription from './Subscription';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -93,6 +95,10 @@ FastMessage.belongsTo(User, { foreignKey: 'recipientId', as: 'recipient' });
 // Device tokens
 User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
 DeviceToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// Subscriptions
+User.hasMany(Subscription, { foreignKey: 'userId', as: 'subscriptions' });
+Subscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // User firsts
 User.hasOne(UserFirsts, { foreignKey: 'userId', as: 'firsts' });
@@ -271,6 +277,7 @@ export {
   UserFirsts,
   Panic,
   PanicReply,
+  Subscription,
 };
 
 // Export a function to sync all models

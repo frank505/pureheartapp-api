@@ -44,6 +44,7 @@ import {
 } from '../middleware/auth';
 import { RedisUtils } from '../config/redis';
 import { appConfig, googleConfig } from '../config/environment';
+import { SubscriptionService } from '../services/subscriptionService';
 
 const client = new OAuth2Client(googleConfig.clientId);
 
@@ -969,10 +970,22 @@ export default async function authRoutes(fastify: FastifyInstance) {
         return reply.status(404).send(response);
       }
 
+      // Attach subscription (premium) summary
+      const activeSub = await SubscriptionService.getActivePremiumForUser(user.id);
       const response: IAPIResponse = {
         success: true,
         message: 'User profile retrieved successfully',
-        data: { user: user.toPublicJSON() },
+        data: { 
+          user: user.toPublicJSON(),
+          subscription: activeSub ? {
+            active: true,
+            productId: activeSub.productId,
+            platform: activeSub.platform,
+            expirationDate: activeSub.expirationDate,
+            willRenew: activeSub.willRenew,
+            periodType: activeSub.periodType,
+          } : { active: false }
+        },
         statusCode: 200,
       };
 

@@ -1,11 +1,13 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { assessDependency, DependencyAssessmentInput } from '../services/dependencyAssessmentService';
+import { authenticate } from '../middleware/auth';
+import { requireLLMAccess, paywallResponse } from '../services/accessControlService';
 
 interface AssessBody extends DependencyAssessmentInput {}
 
 export default async function dependencyRoutes(fastify: FastifyInstance) {
 	// Public endpoint (no auth) to assess porn dependency between 40-100% via LLM
-	fastify.post('/dependency/assess', async (request: FastifyRequest, reply: FastifyReply) => {
+	fastify.post('/dependency/assess', { preHandler: [authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
 		const body = (request.body as AssessBody) || {};
 
 		if (!body.narrative && !body.answers) {
@@ -13,6 +15,11 @@ export default async function dependencyRoutes(fastify: FastifyInstance) {
 		}
 
 		try {
+			const userId = (request as any).userId as number;
+			const access = await requireLLMAccess(userId, 'dependency_assessment');
+			if (!access.allowed) {
+				return reply.status(402).send(paywallResponse('dependency_assessment', access.trialEndsAt));
+			}
 			const result = await assessDependency(body);
 			return reply.send({
 				success: true,

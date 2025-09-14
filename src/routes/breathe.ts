@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { authenticate } from '../middleware/auth';
 import { analyzeBreathe } from '../services/breatheService';
+import { requireLLMAccess, paywallResponse } from '../services/accessControlService';
 
 interface AnalyzeBody {
   text: string; // how the user feels
@@ -20,6 +21,11 @@ export default async function breatheRoutes(fastify: FastifyInstance) {
       const opts: any = {};
       if (typeof cycles === 'number') opts.cycles = cycles;
       if (typeof bibleVersion === 'string' && bibleVersion) opts.bibleVersion = bibleVersion;
+      const userId = (request as any).userId as number;
+      const access = await requireLLMAccess(userId, 'breathe_analysis');
+      if (!access.allowed) {
+        return reply.status(402).send(paywallResponse('breathe_analysis', access.trialEndsAt));
+      }
       const result = await analyzeBreathe(text.trim(), opts);
 
   return reply.send({

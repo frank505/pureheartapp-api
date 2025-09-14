@@ -63,6 +63,10 @@ interface EnvironmentConfig {
   GEMINI_API_KEY: string;
 
   PRODUCTION_PATH: string;
+
+  // RevenueCat (optional)
+  REVENUECAT_WEBHOOK_SECRET?: string;
+  REVENUECAT_ENTITLEMENT_PREMIUM?: string;
 }
 
 /**
@@ -109,7 +113,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
 
-  return {
+  const base: EnvironmentConfig = {
     NODE_ENV: process.env.NODE_ENV!,
     PORT: parseInt(process.env.PORT!, 10),
     HOST: process.env.HOST!,
@@ -152,7 +156,18 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || '',
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
     PRODUCTION_PATH: process.env.PRODUCTION_PATH!,
-  };
+  } as any;
+
+  if (process.env.REVENUECAT_WEBHOOK_SECRET) {
+    (base as any).REVENUECAT_WEBHOOK_SECRET = process.env.REVENUECAT_WEBHOOK_SECRET;
+  }
+  if (process.env.REVENUECAT_ENTITLEMENT_PREMIUM) {
+    (base as any).REVENUECAT_ENTITLEMENT_PREMIUM = process.env.REVENUECAT_ENTITLEMENT_PREMIUM;
+  } else {
+    (base as any).REVENUECAT_ENTITLEMENT_PREMIUM = 'premium';
+  }
+
+  return base;
 };
 
 // Export the configuration object
@@ -223,4 +238,9 @@ export const youtubeConfig = {
 
 export const geminiConfig = {
   apiKey: config.GEMINI_API_KEY,
+};
+
+export const revenuecatConfig = {
+  webhookSecret: config.REVENUECAT_WEBHOOK_SECRET,
+  entitlementPremium: config.REVENUECAT_ENTITLEMENT_PREMIUM || 'premium',
 };
