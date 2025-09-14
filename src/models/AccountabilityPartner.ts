@@ -48,7 +48,7 @@ AccountabilityPartner.init(
     },
     // Foreign key for the user who sent the invitation
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
         model: 'users', // table name
@@ -63,7 +63,7 @@ AccountabilityPartner.init(
     },
     // Foreign key for the user who accepted the invitation
     receiverId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
       references: {
         model: 'users', // table name

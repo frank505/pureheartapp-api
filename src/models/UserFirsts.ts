@@ -47,7 +47,7 @@ class UserFirsts extends Model<IUserFirsts, UserFirstsCreation> implements IUser
 UserFirsts.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, unique: true, references: { model: User, key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, unique: true, references: { model: User, key: 'id' }, field: 'user_id' },
     hasCreatedFast: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'has_created_fast' },
     hasCreatedPrivateCommunity: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'has_created_private_community' },
     hasJoinedReddit: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'has_joined_reddit' },

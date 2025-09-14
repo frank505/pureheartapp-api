@@ -34,7 +34,7 @@ class Victory extends Model<IVictory, VictoryCreation> implements IVictory {
 Victory.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     partnerIds: { type: DataTypes.JSON, allowNull: true, field: 'partner_ids' },
     groupIds: { type: DataTypes.JSON, allowNull: true, field: 'group_ids' },
     title: { type: DataTypes.STRING(255), allowNull: false },

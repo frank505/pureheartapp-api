@@ -25,7 +25,7 @@ FastReminderLog.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
     fastId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'fasts', key: 'id' }, field: 'fast_id' },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     dateKey: { type: DataTypes.STRING(10), allowNull: false, field: 'date_key' },
     timeKey: { type: DataTypes.STRING(5), allowNull: false, field: 'time_key' },
     sentAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'sent_at' },

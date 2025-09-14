@@ -28,7 +28,7 @@ class UserAchievement extends Model<IUserAchievement, UserAchievementCreation> i
 UserAchievement.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     achievementId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'achievements', key: 'id' }, field: 'achievement_id' },
     unlockedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'unlocked_at' },
     progressSnapshot: { type: DataTypes.JSON, allowNull: true, field: 'progress_snapshot' },

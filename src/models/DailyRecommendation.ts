@@ -50,7 +50,7 @@ DailyRecommendation.init(
       primaryKey: true,
     },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: { model: User, key: 'id' },
     },

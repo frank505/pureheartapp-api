@@ -37,7 +37,7 @@ FastPrayerLog.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
     fastId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'fasts', key: 'id' }, field: 'fast_id' },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     prayerTime: { type: DataTypes.STRING(5), allowNull: true, field: 'prayer_time' },
     loggedAt: { type: DataTypes.DATE, allowNull: false, field: 'logged_at' },
     durationSeconds: { type: DataTypes.INTEGER, allowNull: true, field: 'duration_seconds' },

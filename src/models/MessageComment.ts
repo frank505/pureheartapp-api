@@ -38,7 +38,7 @@ class MessageComment
 MessageComment.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' } },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' } },
     messageId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'messages', key: 'id' } },
     body: { type: DataTypes.TEXT, allowNull: false },
     mentions: { type: DataTypes.JSON, allowNull: true },

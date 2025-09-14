@@ -42,7 +42,7 @@ class UserProgress extends Model<IUserProgress, UserProgressCreation> implements
 UserProgress.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     checkInCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'checkin_count' },
     prayerCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'prayer_count' },
     victoryCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'victory_count' },

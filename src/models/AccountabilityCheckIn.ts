@@ -68,7 +68,7 @@ class AccountabilityCheckIn
 AccountabilityCheckIn.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     partnerIds: { type: DataTypes.JSON, allowNull: true, field: 'partner_ids' },
     groupIds: { type: DataTypes.JSON, allowNull: true, field: 'group_ids' },
     mood: { type: DataTypes.DECIMAL(3, 2), allowNull: false },

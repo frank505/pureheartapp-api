@@ -35,7 +35,7 @@ FastProgressLog.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
     fastId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'fasts', key: 'id' }, field: 'fast_id' },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     hungerLevel: { type: DataTypes.INTEGER, allowNull: true, field: 'hunger_level' },
     spiritualClarity: { type: DataTypes.INTEGER, allowNull: true, field: 'spiritual_clarity' },
     temptationStrength: { type: DataTypes.INTEGER, allowNull: true, field: 'temptation_strength' },

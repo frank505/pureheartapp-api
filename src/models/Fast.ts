@@ -89,7 +89,7 @@ class Fast extends Model<IFast, FastCreation> implements IFast {
 Fast.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
     type: {
       type: DataTypes.ENUM('daily', 'nightly', 'weekly', 'custom', 'breakthrough'),
       allowNull: false,

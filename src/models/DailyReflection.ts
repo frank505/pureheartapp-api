@@ -35,7 +35,7 @@ class DailyReflection extends Model<IDailyReflection, DailyReflectionCreation> i
 DailyReflection.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: User, key: 'id' }, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: User, key: 'id' }, field: 'user_id' },
     displayDate: { type: DataTypes.STRING(10), allowNull: false, field: 'display_date', comment: 'YYYY-MM-DD (user local date when to show)'},
     orderInDay: { type: DataTypes.INTEGER, allowNull: false, field: 'order_in_day', comment: '1..5 order within the day' },
     title: { type: DataTypes.STRING(255), allowNull: true },

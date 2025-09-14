@@ -40,7 +40,7 @@ class AccountabilityComment
 AccountabilityComment.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'users', key: 'id' } },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, references: { model: 'users', key: 'id' } },
   targetType: { type: DataTypes.ENUM('checkin', 'prayer_request', 'victory', 'fast_journal'), allowNull: false },
     targetId: { type: DataTypes.INTEGER, allowNull: false },
     body: { type: DataTypes.TEXT, allowNull: false },

@@ -26,7 +26,7 @@ class UserBadge extends Model<IUserBadge, UserBadgeCreation> implements IUserBad
 UserBadge.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false, field: 'user_id' },
+    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, field: 'user_id' },
     badgeId: { type: DataTypes.INTEGER, allowNull: false, field: 'badge_id' },
     unlockedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'unlocked_at' },
     createdAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'created_at' },

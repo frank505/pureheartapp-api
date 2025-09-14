@@ -35,7 +35,7 @@ AIChatSession.init(
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: { model: 'users', key: 'id' },
       onDelete: 'CASCADE',

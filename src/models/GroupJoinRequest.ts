@@ -47,7 +47,7 @@ GroupJoinRequest.init(
       onUpdate: 'CASCADE',
     },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: { model: 'users', key: 'id' },
       onDelete: 'CASCADE',

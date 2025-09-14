@@ -53,7 +53,7 @@ Message.init(
       onUpdate: 'CASCADE',
     },
     authorId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,
       references: { model: 'users', key: 'id' },
       onDelete: 'SET NULL',
