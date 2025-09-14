@@ -53,7 +53,13 @@ class Subscription extends Model<ISubscriptionAttributes, CreationAttrs> impleme
 Subscription.init(
   {
     id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-    userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+    // Use signed INT to match existing production users.id (avoids ER_FK_INCOMPATIBLE_COLUMNS)
+    userId: { 
+      type: DataTypes.INTEGER, 
+      allowNull: false, 
+      references: { model: 'users', key: 'id' }, 
+      field: 'user_id'
+    },
     appUserId: { type: DataTypes.STRING(191), allowNull: false },
     platform: { type: DataTypes.ENUM('apple','google','stripe','amazon','promotional','unknown'), allowNull: false, defaultValue: 'unknown' },
     productId: { type: DataTypes.STRING(191), allowNull: true },
