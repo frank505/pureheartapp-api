@@ -14,6 +14,10 @@ export interface IUser {
   emailVerificationToken?: string | null;
   emailVerificationExpires?: Date | null;
   timezone?: string | null;
+  uninstallSuspectedAt?: Date | null;
+  lastReinstallAt?: Date | null;
+  lastReinstallDeviceId?: string | null;
+  lastReinstallPlatform?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;

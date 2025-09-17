@@ -10,6 +10,7 @@ import { FastifyAdapter } from '@bull-board/fastify';
 import { serverConfig, jwtConfig, appConfig } from './config/environment';
 import { getRedisOptions, RedisUtils, checkRedisHealth } from './config/redis';
 import { testDatabaseConnection, syncAllModels, closeDatabaseConnection } from './config/database';
+import { patchSchema } from './config/schemaPatcher';
 import { initializeQueueSystem, queueManager, checkQueueHealth } from './config/queue';
 import { initializeEmailWorker, closeEmailWorker } from './jobs/emailJobs';
 import authRoutes from './routes/auth';
@@ -37,6 +38,7 @@ import widgetRoutes from './routes/widget';
 import { scheduleFastingCron, initializeFastingWorker } from './jobs/fastingJobs';
 import devicesRoutes from './routes/devices';
 import { initFirebaseIfNeeded } from './services/pushService';
+import { scheduleAccountabilityHealthCron } from './jobs/accountabilityHealthJobs';
 import waitingListRoutes from './routes/waitingList';
 import reflectionsRoutes from './routes/reflections';
 import userFirstsRoutes from './routes/userFirsts';
@@ -44,6 +46,7 @@ import panicRoutes from './routes/panic';
 import dependencyRoutes from './routes/dependency';
 import articlesRoutes from './routes/articles';
 import revenuecatRoutes from './routes/revenuecat';
+import screenshotsRoutes from './routes/screenshots';
 import ARTICLES from './data/articles';
 import Article from './models/Article';
 // Ensure new models are registered before syncing
@@ -152,6 +155,7 @@ const createServer = async (): Promise<FastifyInstance> => {
     Promise.resolve().then(() => scheduleDailyRecommendations()),
   Promise.resolve().then(() => scheduleWeeklyReflections()),
     Promise.resolve().then(() => scheduleFastingCron()),
+  Promise.resolve().then(() => scheduleAccountabilityHealthCron()),
   ]);
 
   // Set up Bull Dashboard for queue monitoring
@@ -338,10 +342,12 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(dependencyRoutes, { prefix: '/api' });
   await fastify.register(articlesRoutes, { prefix: '/api' });
   await fastify.register(revenuecatRoutes, { prefix: '/api' });
+  await fastify.register(screenshotsRoutes, { prefix: '/api' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
     closePromises: [] as Promise<void>[],
+
     closePromiseHandler: async () => {
       fastify.log.info('Received kill signal, shutting down gracefully...');
       
@@ -396,8 +402,8 @@ const startServer = async (): Promise<void> => {
     // Test database connection first
     await testDatabaseConnection();
     
-    // In development, you might want to use `alter: true` to avoid losing data
-    // In production, you'll likely want to use a migration tool instead.
+  // Patch schema for new columns/indexes (idempotent) before sync
+  await patchSchema();
   // Avoid auto-altering schema in dev to prevent repeated index churn
   await syncAllModels(false, false);
     // Initialize default general settings

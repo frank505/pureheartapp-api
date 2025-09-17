@@ -32,6 +32,10 @@ class User extends Model<IUser, UserCreationAttributes> implements IUser {
   public emailVerificationToken?: string | null;
   public emailVerificationExpires?: Date | null;
   public timezone?: string | null;
+  public uninstallSuspectedAt?: Date | null;
+  public lastReinstallAt?: Date | null;
+  public lastReinstallDeviceId?: string | null;
+  public lastReinstallPlatform?: string | null;
 
   // Timestamps (automatically managed by Sequelize)
   public readonly createdAt!: Date;
@@ -414,6 +418,27 @@ User.init(
     timezone: {
       type: DataTypes.STRING(100),
       allowNull: true,
+    },
+
+    uninstallSuspectedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'uninstall_suspected_at'
+    },
+    lastReinstallAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'last_reinstall_at'
+    },
+    lastReinstallDeviceId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'last_reinstall_device_id'
+    },
+    lastReinstallPlatform: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: 'last_reinstall_platform'
     },
 
     // Timestamps

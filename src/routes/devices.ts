@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { authenticate } from '../middleware/auth';
 import { IAPIResponse } from '../types/auth';
 import DeviceToken from '../models/DeviceToken';
+import { detectReinstallForUser } from '../jobs/accountabilityHealthJobs';
 
 export default async function devicesRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', authenticate);
@@ -16,20 +17,24 @@ export default async function devicesRoutes(fastify: FastifyInstance) {
 
   fastify.post('/devices/register', async (request, reply) => {
     const userId = (request as any).userId as number;
-    const { token, platform } = (request.body as any) || {};
+    const { token, platform, deviceId } = (request.body as any) || {};
     if (!token || !platform || !['ios', 'android'].includes(platform)) {
       const response: IAPIResponse = { success: false, message: 'Invalid payload', statusCode: 400 };
       return reply.status(400).send(response);
     }
+    // Reinstall detection (if deviceId provided)
+    await detectReinstallForUser(userId, deviceId, token);
 
+    // Upsert by token (existing behavior)
     const existing = await DeviceToken.findOne({ where: { userId, token } });
     if (existing) {
       (existing as any).platform = platform;
       (existing as any).isActive = true;
       (existing as any).lastActiveAt = new Date();
+      if (deviceId) (existing as any).deviceId = deviceId;
       await existing.save();
     } else {
-      await DeviceToken.create({ userId, token, platform, isActive: true, lastActiveAt: new Date() } as any);
+      await DeviceToken.create({ userId, token, platform, deviceId: deviceId || null, isActive: true, lastActiveAt: new Date() } as any);
     }
 
     const response: IAPIResponse = { success: true, message: 'Device registered', statusCode: 200 };

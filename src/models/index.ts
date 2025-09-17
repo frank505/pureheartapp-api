@@ -46,6 +46,9 @@ import Panic from './Panic';
 import PanicReply from './PanicReply';
 import Article from './Article';
 import Subscription from './Subscription';
+import SensitiveImage from './SensitiveImage';
+import SensitiveImageFinding from './SensitiveImageFinding';
+import SensitiveImageComment from './SensitiveImageComment';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -95,6 +98,14 @@ FastMessage.belongsTo(User, { foreignKey: 'recipientId', as: 'recipient' });
 // Device tokens
 User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
 DeviceToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// Sensitive images
+User.hasMany(SensitiveImage, { foreignKey: 'userId', as: 'sensitiveImages' });
+SensitiveImage.belongsTo(User, { foreignKey: 'userId', as: 'owner' });
+SensitiveImage.hasMany(SensitiveImageFinding, { foreignKey: 'imageId', as: 'findings' });
+SensitiveImageFinding.belongsTo(SensitiveImage, { foreignKey: 'imageId', as: 'image' });
+SensitiveImage.hasMany(SensitiveImageComment, { foreignKey: 'imageId', as: 'comments' });
+SensitiveImageComment.belongsTo(SensitiveImage, { foreignKey: 'imageId', as: 'image' });
 
 // Subscriptions
 User.hasMany(Subscription, { foreignKey: 'userId', as: 'subscriptions' });
@@ -278,6 +289,9 @@ export {
   Panic,
   PanicReply,
   Subscription,
+  SensitiveImage,
+  SensitiveImageFinding,
+  SensitiveImageComment,
 };
 
 // Export a function to sync all models
@@ -326,4 +340,7 @@ export default {
   UserFirsts,
   Panic,
   PanicReply,
+  SensitiveImage,
+  SensitiveImageFinding,
+  SensitiveImageComment,
 };

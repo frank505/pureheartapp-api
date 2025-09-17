@@ -61,6 +61,9 @@ export interface WaitingListThankYouEmailJobData {
   email: string;
 }
 
+export interface AccountabilityUninstallSuspectedEmailJobData { email: string; username: string; lastSeen?: string | null; }
+export interface AccountabilityReinstalledEmailJobData { email: string; username: string; }
+
 /**
  * Union type for all email job data
  */
@@ -72,7 +75,9 @@ export type EmailJobData =
   | GroupInviteEmailJobData
   | AccountabilityInviteEmailJobData
   | FastStartedEmailJobData
-  | WaitingListThankYouEmailJobData;
+  | WaitingListThankYouEmailJobData
+  | AccountabilityUninstallSuspectedEmailJobData
+  | AccountabilityReinstalledEmailJobData;
 
 /**
  * Email job processor class
@@ -254,6 +259,32 @@ export class EmailJobProcessor {
       throw error;
     }
   }
+
+  async processAccountabilityUninstallSuspected(job: Job<AccountabilityUninstallSuspectedEmailJobData>): Promise<void> {
+    const { email, username, lastSeen } = job.data;
+    job.log(`Processing uninstall suspected email for partner ${email} about ${username}`);
+    try {
+      const success = await this.emailService.sendAccountabilityUninstallSuspectedEmail(email, username, lastSeen || undefined);
+      if (!success) throw new Error('Failed to send uninstall suspected email');
+      job.log(`✅ Uninstall suspected email sent to ${email}`);
+    } catch (e) {
+      job.log(`❌ Failed uninstall suspected email to ${email}: ${e}`);
+      throw e;
+    }
+  }
+
+  async processAccountabilityReinstalled(job: Job<AccountabilityReinstalledEmailJobData>): Promise<void> {
+    const { email, username } = job.data;
+    job.log(`Processing reinstall email for partner ${email} about ${username}`);
+    try {
+      const success = await this.emailService.sendAccountabilityReinstalledEmail(email, username);
+      if (!success) throw new Error('Failed to send reinstall email');
+      job.log(`✅ Reinstall email sent to ${email}`);
+    } catch (e) {
+      job.log(`❌ Failed reinstall email to ${email}: ${e}`);
+      throw e;
+    }
+  }
 }
 
 /**
@@ -317,6 +348,12 @@ export class EmailWorker {
           break;
         case JOB_TYPES.EMAIL.WAITING_LIST_THANK_YOU:
           await this.processor.processWaitingListThankYouEmail(job as Job<WaitingListThankYouEmailJobData>);
+          break;
+        case JOB_TYPES.EMAIL.ACCOUNTABILITY_UNINSTALL_SUSPECTED:
+          await this.processor.processAccountabilityUninstallSuspected(job as Job<AccountabilityUninstallSuspectedEmailJobData>);
+          break;
+        case JOB_TYPES.EMAIL.ACCOUNTABILITY_REINSTALLED:
+          await this.processor.processAccountabilityReinstalled(job as Job<AccountabilityReinstalledEmailJobData>);
           break;
 
         default:

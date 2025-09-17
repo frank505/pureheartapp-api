@@ -113,6 +113,40 @@ export class EmailService implements IEmailService {
     }
   }
 
+  async sendAccountabilityUninstallSuspectedEmail(email: string, username: string, lastSeen?: string): Promise<boolean> {
+    try {
+      const subject = `${appConfig.name} - ${username} may have uninstalled the app`;
+      const safeLast = lastSeen ? new Date(lastSeen).toLocaleString() : 'Unknown';
+      const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.5;background:#f7f7f7;padding:20px;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px;">
+      <h2 style="margin-top:0;">Possible Uninstall Detected</h2>
+      <p><strong>${username}</strong> has no active push notification tokens. This may mean they uninstalled or disabled the app.</p>
+      <p>Last seen: ${safeLast}</p>
+      <p>Please consider reaching out via another method to encourage them.</p>
+      <p style="color:#666;font-size:12px;">You receive this because you're listed as an accountability partner in ${appConfig.name}.</p>
+      </div></body></html>`;
+      const text = `${username} may have uninstalled the app. Last seen: ${safeLast}. Reach out to encourage them.`;
+      const mailOptions = { from: emailConfig.from, to: email, subject, html, text } as any;
+      await this.transporter.emails.send(mailOptions);
+      return true;
+    } catch (e) { console.error('Error sending uninstall suspected email', e); return false; }
+  }
+
+  async sendAccountabilityReinstalledEmail(email: string, username: string): Promise<boolean> {
+    try {
+      const subject = `${appConfig.name} - ${username} is back online`;
+      const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.5;background:#f7f7f7;padding:20px;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px;">
+      <h2 style="margin-top:0;">They're Back 🎉</h2>
+      <p><strong>${username}</strong> has reinstalled or reopened the app and is active again.</p>
+      <p>Send them a quick encouragement or check-in today.</p>
+      <p style="color:#666;font-size:12px;">You receive this because you're an accountability partner in ${appConfig.name}.</p>
+      </div></body></html>`;
+      const text = `${username} has reinstalled or reopened the app and is active again. Send encouragement.`;
+      const mailOptions = { from: emailConfig.from, to: email, subject, html, text } as any;
+      await this.transporter.emails.send(mailOptions);
+      return true;
+    } catch (e) { console.error('Error sending reinstall email', e); return false; }
+  }
+
   /**
    * Send group invite email with invite code
    */
