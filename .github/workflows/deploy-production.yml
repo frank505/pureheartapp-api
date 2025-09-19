@@ -212,6 +212,7 @@ jobs:
           EMAIL_VERIFICATION_EXPIRES=${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
           INVITE_MATCH_WINDOW_SECONDS=${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
           PRODUCTION_PATH=${{ secrets.PRODUCTION_PATH }}
+          PUBLIC_PATH=${{ secrets.PRODUCTION_PATH }}/public
           # Google and Firebase Configuration
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
