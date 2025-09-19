@@ -64,6 +64,79 @@ const client = new OAuth2Client(googleConfig.clientId);
 
 export default async function authRoutes(fastify: FastifyInstance) {
   /**
+   * Google OAuth Web Callback
+   * GET /api/auth/google/callback
+   * Accepts either `code` (OAuth authorization code) or `id_token` (from Google One Tap).
+   * On success, issues our JWT and redirects to deep link: OAUTH_REDIRECT_URI + our token.
+   */
+  fastify.get('/google/callback', async (request, reply) => {
+    try {
+      const { code, id_token, state } = request.query as any;
+
+      let email: string | undefined;
+      let given_name = '';
+      let family_name = '';
+
+      if (id_token) {
+        // Verify ID token directly (One Tap or implicit flow)
+        const ticket = await client.verifyIdToken({ idToken: id_token, audience: googleConfig.clientId });
+        const payload = ticket.getPayload();
+        email = payload?.email;
+        given_name = payload?.given_name || '';
+        family_name = payload?.family_name || '';
+      } else if (code) {
+        // Exchange authorization code for tokens, then verify id_token
+        if (!googleConfig.clientId || !googleConfig.clientSecret || !googleConfig.redirectUri) {
+          return reply.status(400).send({ success: false, message: 'Google OAuth not configured', statusCode: 400 });
+        }
+        const oauthClient = new OAuth2Client({
+          clientId: googleConfig.clientId,
+          clientSecret: googleConfig.clientSecret,
+          redirectUri: googleConfig.redirectUri,
+        } as any);
+        const { tokens } = await oauthClient.getToken(code);
+        const ticket = await client.verifyIdToken({ idToken: tokens.id_token as string, audience: googleConfig.clientId });
+        const payload = ticket.getPayload();
+        email = payload?.email;
+        given_name = payload?.given_name || '';
+        family_name = payload?.family_name || '';
+      } else {
+        return reply.status(400).send({ success: false, message: 'Missing code or id_token', statusCode: 400 });
+      }
+
+      if (!email) {
+        return reply.status(401).send({ success: false, message: 'Invalid Google token', statusCode: 401 });
+      }
+
+      // Find or create user
+      let user = await User.findByEmail(email);
+      const isNew = !user;
+      if (!user) {
+        const username = await User.generateUniqueUsername(given_name, family_name);
+        user = await User.create({
+          email,
+          firstName: given_name,
+          lastName: family_name,
+          username,
+          isEmailVerified: true,
+        });
+      }
+
+      const tokens = generateTokens(user!.toPublicJSON());
+
+      // Build deep link redirect
+      const base = appConfig.oauthRedirectUri || 'pureheart://auth/callback?ourownjwttoken=';
+      const url = `${base}${encodeURIComponent(tokens.accessToken)}`;
+
+      // Optionally carry through state
+      const finalUrl = state ? `${url}&state=${encodeURIComponent(String(state))}` : url;
+      return reply.redirect(finalUrl);
+    } catch (err) {
+      request.log.error('Google OAuth callback error:', err);
+      return reply.status(500).send({ success: false, message: 'OAuth callback failed', statusCode: 500 });
+    }
+  });
+  /**
    * Google Login Endpoint
    * POST /api/auth/google-login
    * 

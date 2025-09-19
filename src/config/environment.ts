@@ -52,6 +52,8 @@ interface EnvironmentConfig {
 
   // Google OAuth Configuration
   GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REDIRECT_URI?: string;
 
   // Invite Match Configuration
   INVITE_MATCH_WINDOW_SECONDS: number;
@@ -63,6 +65,9 @@ interface EnvironmentConfig {
   GEMINI_API_KEY: string;
 
   PRODUCTION_PATH: string;
+
+  // Deep link for OAuth callback redirect (e.g., pureheart://auth/callback?ourownjwttoken=)
+  OAUTH_REDIRECT_URI?: string;
 
   // RevenueCat (optional)
   REVENUECAT_WEBHOOK_SECRET?: string;
@@ -150,12 +155,15 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     EMAIL_VERIFICATION_EXPIRES: parseInt(process.env.EMAIL_VERIFICATION_EXPIRES!, 10),
     
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
 
     INVITE_MATCH_WINDOW_SECONDS: parseInt(process.env.INVITE_MATCH_WINDOW_SECONDS!, 10),
 
     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || '',
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
     PRODUCTION_PATH: process.env.PRODUCTION_PATH!,
+  OAUTH_REDIRECT_URI: process.env.OAUTH_REDIRECT_URI,
   } as any;
 
   if (process.env.REVENUECAT_WEBHOOK_SECRET) {
@@ -217,6 +225,7 @@ export const appConfig = {
   apiUrl: config.API_URL,
   frontendUrl: config.FRONTEND_URL,
   appStoreUrl: config.APP_STORE_URL,
+  oauthRedirectUri: config.OAUTH_REDIRECT_URI,
 };
 
 export const securityConfig = {
@@ -228,6 +237,8 @@ export const securityConfig = {
 
 export const googleConfig = {
   clientId: config.GOOGLE_CLIENT_ID,
+  clientSecret: config.GOOGLE_CLIENT_SECRET,
+  redirectUri: config.GOOGLE_REDIRECT_URI,
 };
 
 

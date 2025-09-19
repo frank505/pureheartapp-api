@@ -52,10 +52,13 @@ jobs:
           EMAIL_VERIFICATION_EXPIRES: ${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
           # Google and Firebase configuration
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
           INVITE_MATCH_WINDOW_SECONDS: ${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          OAUTH_REDIRECT_URI: ${{ secrets.OAUTH_REDIRECT_URI }}
           # Additional app store URLs
           APP_STORE_URL_IOS: ${{ secrets.APP_STORE_URL_IOS }}
           APP_STORE_URL_ANDROID: ${{ secrets.APP_STORE_URL_ANDROID }}
@@ -211,9 +214,12 @@ jobs:
           PRODUCTION_PATH=${{ secrets.PRODUCTION_PATH }}
           # Google and Firebase Configuration
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_JSON=${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          OAUTH_REDIRECT_URI=${{ secrets.OAUTH_REDIRECT_URI }}
           EOF
 
       - name: Check and prepare server
