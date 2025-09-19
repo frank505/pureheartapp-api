@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { FastifyAdapter } from '@bull-board/fastify';
-import { serverConfig, jwtConfig, appConfig } from './config/environment';
+import { serverConfig, jwtConfig, appConfig, config } from './config/environment';
 import { getRedisOptions, RedisUtils, checkRedisHealth } from './config/redis';
 import { testDatabaseConnection, syncAllModels, closeDatabaseConnection } from './config/database';
 import { patchSchema } from './config/schemaPatcher';
@@ -299,6 +299,8 @@ const createServer = async (): Promise<FastifyInstance> => {
 
   // API information endpoint
   fastify.get('/', async (request, reply) => {
+  const publicFsPath = path.join(__dirname, '..', 'public');
+  const publicUrlPrefix = '/public/';
     const response: IAPIResponse = {
       success: true,
       message: 'Welcome to Christian Recovery App API',
@@ -306,6 +308,9 @@ const createServer = async (): Promise<FastifyInstance> => {
         name: appConfig.name,
         version: '1.0.0',
         environment: serverConfig.NODE_ENV,
+    public_path: publicFsPath,
+    public_url_prefix: publicUrlPrefix,
+  production_path: config.PRODUCTION_PATH,
         endpoints: {
           health: '/health',
           auth: '/api/auth',
