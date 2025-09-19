@@ -299,9 +299,6 @@ const createServer = async (): Promise<FastifyInstance> => {
 
   // API information endpoint
   fastify.get('/', async (request, reply) => {
-    const publicPath = path.join(__dirname, '..', 'public');
-    const audioPath = path.join(__dirname, '1min_clips');
-    
     const response: IAPIResponse = {
       success: true,
       message: 'Welcome to Christian Recovery App API',
@@ -309,14 +306,6 @@ const createServer = async (): Promise<FastifyInstance> => {
         name: appConfig.name,
         version: '1.0.0',
         environment: serverConfig.NODE_ENV,
-        serverPaths: {
-          publicPath: publicPath,
-          publicPathResolved: path.resolve(publicPath),
-          audioPath: audioPath,
-          audioPathResolved: path.resolve(audioPath),
-          currentDir: __dirname,
-          workingDir: process.cwd()
-        },
         endpoints: {
           health: '/health',
           auth: '/api/auth',
