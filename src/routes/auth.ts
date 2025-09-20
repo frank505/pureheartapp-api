@@ -126,12 +126,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
       const tokens = generateTokens(user!.toPublicJSON());
 
       // Build deep link redirect
-      const base = appConfig.oauthRedirectUri || 'pureheart://auth/callback?ourownjwttoken=';
-      const url = `${base}${encodeURIComponent(tokens.accessToken)}`;
-
+      const baseUri = appConfig.oauthRedirectUri || 'pureheart://auth/callback';
+      const url = new URL(baseUri);
+      url.searchParams.set('ourownjwttoken', tokens.accessToken);
+      
       // Optionally carry through state
-      const finalUrl = state ? `${url}&state=${encodeURIComponent(String(state))}` : url;
-      return reply.redirect(finalUrl);
+      if (state) {
+        url.searchParams.set('state', String(state));
+      }
+      
+      return reply.redirect(url.toString());
     } catch (err) {
       request.log.error('Google OAuth callback error:', err);
       return reply.status(500).send({ success: false, message: 'OAuth callback failed', statusCode: 500 });
@@ -200,12 +204,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
       const tokens = generateTokens(user!.toPublicJSON());
 
       // Build deep link redirect
-      const base = appConfig.oauthRedirectUri || 'pureheart://auth/callback?ourownjwttoken=';
-      const url = `${base}${encodeURIComponent(tokens.accessToken)}`;
-
+      const baseUri = appConfig.oauthRedirectUri || 'pureheart://auth/callback';
+      const url = new URL(baseUri);
+      url.searchParams.set('ourownjwttoken', tokens.accessToken);
+      
       // Optionally carry through state
-      const finalUrl = state ? `${url}&state=${encodeURIComponent(String(state))}` : url;
-      return reply.redirect(finalUrl);
+      if (state) {
+        url.searchParams.set('state', String(state));
+      }
+      
+      return reply.redirect(url.toString());
     } catch (err) {
       request.log.error('Apple OAuth callback error:', err);
       return reply.status(500).send({ success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
