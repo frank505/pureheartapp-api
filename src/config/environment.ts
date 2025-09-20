@@ -55,6 +55,13 @@ interface EnvironmentConfig {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
 
+  // Apple OAuth Configuration
+  APPLE_CLIENT_ID?: string;
+  APPLE_TEAM_ID?: string;
+  APPLE_KEY_ID?: string;
+  APPLE_PRIVATE_KEY?: string;
+  APPLE_REDIRECT_URI?: string;
+
   // Invite Match Configuration
   INVITE_MATCH_WINDOW_SECONDS: number;
 
@@ -158,6 +165,12 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
 
+  APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
+  APPLE_TEAM_ID: process.env.APPLE_TEAM_ID,
+  APPLE_KEY_ID: process.env.APPLE_KEY_ID,
+  APPLE_PRIVATE_KEY: process.env.APPLE_PRIVATE_KEY,
+  APPLE_REDIRECT_URI: process.env.APPLE_REDIRECT_URI,
+
     INVITE_MATCH_WINDOW_SECONDS: parseInt(process.env.INVITE_MATCH_WINDOW_SECONDS!, 10),
 
     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY || '',
@@ -239,6 +252,14 @@ export const googleConfig = {
   clientId: config.GOOGLE_CLIENT_ID,
   clientSecret: config.GOOGLE_CLIENT_SECRET,
   redirectUri: config.GOOGLE_REDIRECT_URI,
+};
+
+export const appleConfig = {
+  clientId: config.APPLE_CLIENT_ID,
+  teamId: config.APPLE_TEAM_ID,
+  keyId: config.APPLE_KEY_ID,
+  privateKey: config.APPLE_PRIVATE_KEY,
+  redirectUri: config.APPLE_REDIRECT_URI,
 };
 
 

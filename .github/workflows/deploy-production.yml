@@ -59,6 +59,12 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           OAUTH_REDIRECT_URI: ${{ secrets.OAUTH_REDIRECT_URI }}
+          # Apple OAuth configuration
+          APPLE_CLIENT_ID: ${{ secrets.APPLE_CLIENT_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_PRIVATE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
+          APPLE_REDIRECT_URI: ${{ secrets.APPLE_REDIRECT_URI }}
           # Additional app store URLs
           APP_STORE_URL_IOS: ${{ secrets.APP_STORE_URL_IOS }}
           APP_STORE_URL_ANDROID: ${{ secrets.APP_STORE_URL_ANDROID }}
@@ -212,7 +218,6 @@ jobs:
           EMAIL_VERIFICATION_EXPIRES=${{ secrets.EMAIL_VERIFICATION_EXPIRES }}
           INVITE_MATCH_WINDOW_SECONDS=${{ secrets.INVITE_MATCH_WINDOW_SECONDS }}
           PRODUCTION_PATH=${{ secrets.PRODUCTION_PATH }}
-          PUBLIC_PATH=${{ secrets.PRODUCTION_PATH }}/public
           # Google and Firebase Configuration
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -221,6 +226,12 @@ jobs:
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_JSON=${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           OAUTH_REDIRECT_URI=${{ secrets.OAUTH_REDIRECT_URI }}
+          # Apple OAuth Configuration
+          APPLE_CLIENT_ID=${{ secrets.APPLE_CLIENT_ID }}
+          APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}
+          APPLE_PRIVATE_KEY=${{ secrets.APPLE_PRIVATE_KEY }}
+          APPLE_REDIRECT_URI=${{ secrets.APPLE_REDIRECT_URI }}
           EOF
 
       - name: Check and prepare server

@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { OAuth2Client } from 'google-auth-library';
+import appleSigninAuth from 'apple-signin-auth';
 import {
   ILoginRequest,
   IRegisterRequest,
@@ -43,7 +44,7 @@ import {
   AuthenticatedFastifyRequest,
 } from '../middleware/auth';
 import { RedisUtils } from '../config/redis';
-import { appConfig, googleConfig } from '../config/environment';
+import { appConfig, googleConfig, appleConfig } from '../config/environment';
 import { SubscriptionService } from '../services/subscriptionService';
 
 const client = new OAuth2Client(googleConfig.clientId);
@@ -136,6 +137,81 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ success: false, message: 'OAuth callback failed', statusCode: 500 });
     }
   });
+
+  /**
+   * Apple OAuth Web Callback
+   * GET /api/auth/apple/callback
+   * Accepts `code` (OAuth authorization code) or `id_token` from Apple Sign-In.
+   * On success, issues our JWT and redirects to deep link: OAUTH_REDIRECT_URI + our token.
+   */
+  fastify.get('/apple/callback', async (request, reply) => {
+    try {
+      const { code, id_token, state } = request.query as any;
+
+      let email: string | undefined;
+      let given_name = '';
+      let family_name = '';
+
+      if (id_token) {
+        // Verify ID token directly
+        if (!appleConfig.clientId) {
+          return reply.status(400).send({ success: false, message: 'Apple OAuth not configured', statusCode: 400 });
+        }
+
+        const payload = await appleSigninAuth.verifyIdToken(id_token, {
+          audience: appleConfig.clientId,
+          nonce: undefined, // You might want to implement nonce verification for added security
+        });
+
+        email = payload.email;
+        // Apple doesn't always provide name details in the ID token for returning users
+        given_name = '';
+        family_name = '';
+      } else if (code) {
+        // For authorization code flow, you would exchange the code for tokens here
+        // This typically requires additional setup with Apple's token endpoint
+        return reply.status(400).send({ 
+          success: false, 
+          message: 'Authorization code flow not implemented. Use id_token instead.', 
+          statusCode: 400 
+        });
+      } else {
+        return reply.status(400).send({ success: false, message: 'Missing code or id_token', statusCode: 400 });
+      }
+
+      if (!email) {
+        return reply.status(401).send({ success: false, message: 'Invalid Apple token', statusCode: 401 });
+      }
+
+      // Find or create user
+      let user = await User.findByEmail(email);
+      const isNew = !user;
+      if (!user) {
+        const username = await User.generateUniqueUsername(given_name, family_name);
+        user = await User.create({
+          email,
+          firstName: given_name || 'Apple',
+          lastName: family_name || 'User',
+          username,
+          isEmailVerified: true,
+        });
+      }
+
+      const tokens = generateTokens(user!.toPublicJSON());
+
+      // Build deep link redirect
+      const base = appConfig.oauthRedirectUri || 'pureheart://auth/callback?ourownjwttoken=';
+      const url = `${base}${encodeURIComponent(tokens.accessToken)}`;
+
+      // Optionally carry through state
+      const finalUrl = state ? `${url}&state=${encodeURIComponent(String(state))}` : url;
+      return reply.redirect(finalUrl);
+    } catch (err) {
+      request.log.error('Apple OAuth callback error:', err);
+      return reply.status(500).send({ success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
+    }
+  });
+
   /**
    * Google Login Endpoint
    * POST /api/auth/google-login
@@ -252,26 +328,30 @@ export default async function authRoutes(fastify: FastifyInstance) {
   });
 
   /**
-   * Apple Login Endpoint (Placeholder)
+   * Apple Login Endpoint
    * POST /api/auth/apple-login
    * 
-   * A placeholder for Apple login functionality.
+   * Authenticates a user with an Apple ID token and saves onboarding data.
    */
   fastify.post<{ Body: IAppleLoginRequest }>('/apple-login', async (request, reply) => {
-    // This is a placeholder and needs a real Apple ID token verification implementation
-    // For now, it simulates the logic based on a mock payload.
     const { idToken, onboardingData, accountability_partner_hash } = request.body;
     const t = await sequelize.transaction();
 
     try {
-      // In a real implementation, you would verify the Apple ID token here.
-      // const appleUser = await verifyAppleToken(idToken);
-      // For demonstration, we'll use a mock payload.
-      const payload = {
-        email: `user-${Date.now()}@apple.com`,
-        given_name: 'Apple',
-        family_name: 'User',
-      };
+      // Verify the Apple ID token
+      if (!appleConfig.clientId) {
+        await t.rollback();
+        return reply.status(400).send({
+          success: false,
+          message: 'Apple OAuth not configured',
+          statusCode: 400,
+        });
+      }
+
+      const payload = await appleSigninAuth.verifyIdToken(idToken, {
+        audience: appleConfig.clientId,
+        nonce: undefined, // You might want to implement nonce verification for added security
+      });
 
       if (!payload || !payload.email) {
         await t.rollback();
@@ -283,22 +363,35 @@ export default async function authRoutes(fastify: FastifyInstance) {
       }
 
       let user = await User.findByEmail(payload.email);
+      let isRegistration = false;
 
       if (!user) {
-        const username = await User.generateUniqueUsername(payload.given_name || '', payload.family_name || '');
+        isRegistration = true;
+        // Apple doesn't always provide names in the token for returning users
+        const firstName = payload.email.split('@')[0] || 'Apple';
+        const lastName = 'User';
+        const username = await User.generateUniqueUsername(firstName, lastName);
         user = await User.create({
           email: payload.email,
-          firstName: payload.given_name || '',
-          lastName: payload.family_name || '',
+          firstName,
+          lastName,
           username,
           isEmailVerified: true,
         }, { transaction: t });
       }
 
-      await OnboardingData.create({
-        userId: user.id,
-        ...onboardingData,
-      }, { transaction: t });
+      if (isRegistration && onboardingData) {
+        await Promise.all([
+          OnboardingData.create({
+            userId: user.id,
+            ...onboardingData,
+          }, { transaction: t }),
+          TruthLiesQueueService.addGenerateTruthLiesJob(user.id, onboardingData)
+        ]);
+      } else if (isRegistration) {
+        // Generate general truth/lies if no onboarding data
+        await TruthLiesQueueService.addGenerateTruthLiesJob(user.id);
+      }
 
       if (accountability_partner_hash) {
         const accountabilityPartner = await AccountabilityPartner.findOne({ where: { hash: accountability_partner_hash } });
