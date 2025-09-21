@@ -16,6 +16,8 @@ import { initializeEmailWorker, closeEmailWorker } from './jobs/emailJobs';
 import authRoutes from './routes/auth';
 import inviteRoutes from './routes/invite';
 import groupRoutes from './routes/groups';
+import logViewerRoutes from './routes/logViewer';
+import { registerHttpLogging } from './middleware/httpLogging';
 import { initializeNotificationWorker } from './jobs/notificationJobs';
 import { IAPIResponse } from './types/auth';
 import path from 'path';
@@ -135,6 +137,9 @@ const createServer = async (): Promise<FastifyInstance> => {
 
   // Add Redis utilities to Fastify instance
   fastify.decorate('redisUtils', new RedisUtils(fastify.redis));
+
+  // Register HTTP logging middleware
+  registerHttpLogging(fastify);
 
   // Initialize queue system
   initializeQueueSystem();
@@ -311,6 +316,7 @@ const createServer = async (): Promise<FastifyInstance> => {
           auth: '/api/auth',
           invite: '/api/invite',
           queues: '/admin/queues', // Bull Dashboard for queue monitoring
+          logs: '/logs', // Log viewer (requires authentication: root/password)
           docs: '/docs' // If you add API documentation later
         }
       },
@@ -343,6 +349,9 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(articlesRoutes, { prefix: '/api' });
   await fastify.register(revenuecatRoutes, { prefix: '/api' });
   await fastify.register(screenshotsRoutes, { prefix: '/api' });
+  
+  // Register log viewer routes (protected with authentication)
+  await fastify.register(logViewerRoutes, { prefix: '/logs' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
