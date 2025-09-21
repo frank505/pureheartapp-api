@@ -32,6 +32,18 @@ export default async function logViewerRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Serve the log viewer UI at /logs route as well
+  fastify.get('/logs', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+    const htmlPath = path.join(__dirname, '../views/logViewer.html');
+    
+    if (await fs.pathExists(htmlPath)) {
+      const html = await fs.readFile(htmlPath, 'utf-8');
+      reply.type('text/html').send(html);
+    } else {
+      reply.status(404).send({ error: 'Log viewer UI not found' });
+    }
+  });
+
   // Get available log files
   fastify.get('/api/files', async (request: AuthenticatedRequest, reply: FastifyReply) => {
     try {

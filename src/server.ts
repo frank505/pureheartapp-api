@@ -341,6 +341,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(fastRoutes, { prefix: '/api' });
   await fastify.register(widgetRoutes, { prefix: '/api' });
   await fastify.register(devicesRoutes, { prefix: '/api' });
+  await fastify.register(logViewerRoutes, { prefix: '/admin' });
   await fastify.register(waitingListRoutes, { prefix: '/api' });
   await fastify.register(reflectionsRoutes, { prefix: '/api' });
   await fastify.register(userFirstsRoutes, { prefix: '/api' });
@@ -349,9 +350,6 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(articlesRoutes, { prefix: '/api' });
   await fastify.register(revenuecatRoutes, { prefix: '/api' });
   await fastify.register(screenshotsRoutes, { prefix: '/api' });
-  
-  // Register log viewer routes (protected with authentication)
-  await fastify.register(logViewerRoutes, { prefix: '/logs' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
