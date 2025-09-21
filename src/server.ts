@@ -13,7 +13,6 @@ import { testDatabaseConnection, syncAllModels, closeDatabaseConnection } from '
 import { patchSchema } from './config/schemaPatcher';
 import { initializeQueueSystem, queueManager, checkQueueHealth } from './config/queue';
 import { initializeEmailWorker, closeEmailWorker } from './jobs/emailJobs';
-import { initializeLogging } from './config/logging';
 import authRoutes from './routes/auth';
 import inviteRoutes from './routes/invite';
 import groupRoutes from './routes/groups';
@@ -48,7 +47,6 @@ import dependencyRoutes from './routes/dependency';
 import articlesRoutes from './routes/articles';
 import revenuecatRoutes from './routes/revenuecat';
 import screenshotsRoutes from './routes/screenshots';
-import logRoutes from './routes/logs';
 import ARTICLES from './data/articles';
 import Article from './models/Article';
 // Ensure new models are registered before syncing
@@ -137,9 +135,6 @@ const createServer = async (): Promise<FastifyInstance> => {
 
   // Add Redis utilities to Fastify instance
   fastify.decorate('redisUtils', new RedisUtils(fastify.redis));
-
-  // Initialize logging system
-  initializeLogging(fastify);
 
   // Initialize queue system
   initializeQueueSystem();
@@ -316,7 +311,6 @@ const createServer = async (): Promise<FastifyInstance> => {
           auth: '/api/auth',
           invite: '/api/invite',
           queues: '/admin/queues', // Bull Dashboard for queue monitoring
-          logs: '/admin/logs', // API Logs dashboard
           docs: '/docs' // If you add API documentation later
         }
       },
@@ -349,7 +343,6 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(articlesRoutes, { prefix: '/api' });
   await fastify.register(revenuecatRoutes, { prefix: '/api' });
   await fastify.register(screenshotsRoutes, { prefix: '/api' });
-  await fastify.register(logRoutes, { prefix: '/admin' });
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
@@ -455,7 +448,6 @@ const startServer = async (): Promise<void> => {
     fastify.log.info(`⚡ Redis connected successfully`);
     fastify.log.info(`📬 Queue system initialized`);
     fastify.log.info(`📊 Queue dashboard available at http://localhost:${serverConfig.PORT}/admin/queues`);
-    fastify.log.info(`📋 API logs dashboard available at http://localhost:${serverConfig.PORT}/admin/logs`);
     fastify.log.info(`🔐 JWT authentication enabled`);
     
   } catch (error) {
