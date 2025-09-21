@@ -110,8 +110,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       }
 
       // Find or create user
-      let user = await User.findByEmail(email);
-      const isNew = !user;
+      let user = await User.findByEmail(email);;
       if (!user) {
         const username = await User.generateUniqueUsername(given_name, family_name);
         user = await User.create({
@@ -131,17 +130,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
       // Handle deep link URLs properly - they don't support URL constructor the same way
       let redirectUrl: string;
       if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
-        // Standard HTTP URL - use URL constructor
-        const url = new URL(baseUri);
-        url.searchParams.set('ourownjwttoken', tokens.accessToken);
+        // Standard HTTP URL - use URL constructo
+      redirectUrl =  baseUri+"?ourownjwttoken="+encodeURIComponent(tokens.accessToken);
         if (state) {
-          url.searchParams.set('state', String(state));
+          redirectUrl = redirectUrl + "&state=" + encodeURIComponent(String(state));
         }
-        redirectUrl = url.toString();
       } else {
-        // Deep link URL - construct manually
-        const separator = baseUri.includes('?') ? '&' : '?';
-        redirectUrl = `${baseUri}${separator}ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
+        redirectUrl = `${baseUri}?ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
         if (state) {
           redirectUrl += `&state=${encodeURIComponent(String(state))}`;
         }
