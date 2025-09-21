@@ -9,6 +9,7 @@
     "build": "tsc && npm run build:copy-assets",
     "build:copy-assets": "cp -r src/1min_clips dist/1min_clips",
     "start": "node dist/server.js",
+  "deploy": "bash ./deploy.sh",
     "typecheck": "tsc --noEmit",
     "audio:normalize": "ts-node scripts/normalizeAudioNames.ts",
     "seed:articles": "ts-node scripts/seedArticles.ts",

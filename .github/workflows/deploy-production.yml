@@ -374,6 +374,7 @@ jobs:
           # Execute deployment on server 
           echo "Executing deployment on server..."
           ssh -v -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} "
+            set -euo pipefail
             cd ${{ secrets.PRODUCTION_PATH }}
             
             # Backup existing node_modules if it exists
@@ -397,7 +398,10 @@ jobs:
             # Make deploy script executable and run it
             chmod +x deploy.sh
             echo 'Starting deployment script...'
-            timeout 300 ./deploy.sh '${{ secrets.PRODUCTION_PATH }}'
+            if ! timeout 300 ./deploy.sh '${{ secrets.PRODUCTION_PATH }}'; then
+              echo 'deploy.sh failed — aborting.'
+              exit 1
+            fi
             
             echo 'Deployment script completed'
             echo 'Final PM2 status:'

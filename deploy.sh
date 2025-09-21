@@ -58,27 +58,42 @@ check_environment() {
     # Source the .env file if it exists
     if [ -f ".env" ]; then
         print_info "Loading environment variables from .env file..."
-        
-        # Load .env file safely, ignoring comments and empty lines
+
+        # We only need a subset for preflight checks; safely parse KEY=VALUE lines.
+        # This avoids errors from multiline secrets (e.g., APPLE_PRIVATE_KEY, JSON) that are not shell-safe.
+        SAFE_ENV_LINES=$(mktemp)
+        # Normalize CRLF to LF, keep only lines with a valid KEY=VALUE pattern on a single line.
+        tr -d '\r' < .env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=.*' > "$SAFE_ENV_LINES" || true
+
+        # Load exportable lines without failing on malformed entries.
         while IFS='=' read -r key value; do
-            # Skip comments and empty lines
-            if [[ $key != \#* ]] && [ ! -z "$key" ]; then
-                # Remove any leading/trailing whitespace and quotes
-                key=$(echo "$key" | xargs)
-                value=$(echo "$value" | xargs)
-                
-                # Remove quotes if they exist
-                value="${value%\"}"
-                value="${value#\"}"
-                value="${value%\'}"
-                value="${value#\'}"
-                
-                # Export the variable
-                export "$key"="$value"
+            # Skip comments/blank
+            if [[ -z "$key" || "$key" =~ ^\# ]]; then
+                continue
             fi
-        done < .env
-        
-        print_status ".env file loaded successfully"
+
+            # Ensure key is a valid identifier
+            if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+                print_warning "Skipping invalid env key: $key"
+                continue
+            fi
+
+            # Trim surrounding whitespace on value only (preserve internal spaces and '=' following fields)
+            value="${value%%$'\n'*}"
+            value=$(printf "%s" "$value" | sed -E 's/^\s+//; s/\s+$//')
+
+            # Strip wrapping quotes if present
+            case "$value" in
+                "\""*) value="${value#\"}"; value="${value%\"}" ;;
+                "'") value="${value#\'}"; value="${value%\'}" ;;
+            esac
+
+            # Export as KEY=VALUE (value may still contain '=' which is fine on a single line)
+            export "$key=$value" || print_warning "Could not export $key from .env"
+        done < "$SAFE_ENV_LINES"
+
+        rm -f "$SAFE_ENV_LINES"
+        print_status ".env file loaded (invalid/multiline entries skipped)"
     else
         print_warning ".env file not found, assuming environment variables are already set"
     fi
