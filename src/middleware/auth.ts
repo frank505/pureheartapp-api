@@ -91,7 +91,7 @@ export const authenticate = async (
 
     // Continue to the next handler
   } catch (error) {
-    request.log.error('Authentication error:', error);
+    request.log.error({ err: error }, 'Authentication error');
     
     const response: IAPIResponse = {
       success: false,
@@ -148,7 +148,7 @@ export const optionalAuthenticate = async (
     // Continue regardless of authentication success or failure
   } catch (error) {
     // Log the error but don't block the request
-    request.log.warn('Optional authentication failed:', error);
+    request.log.warn({ err: error }, 'Optional authentication failed');
   }
 };
 
@@ -246,7 +246,7 @@ export const rateLimit = (
       reply.header('X-RateLimit-Reset', (Date.now() + (windowSeconds * 1000)).toString());
 
     } catch (error) {
-      request.log.error('Rate limiting error:', error);
+      request.log.error({ err: error }, 'Rate limiting error');
       // Continue without rate limiting if Redis fails
     }
   };
@@ -320,7 +320,7 @@ export const accountLockout = (maxAttempts: number = 5, lockoutMinutes: number =
       }
 
     } catch (error) {
-      request.log.error('Account lockout check error:', error);
+      request.log.error({ err: error }, 'Account lockout check error');
       // Continue without lockout protection if Redis fails
     }
   };

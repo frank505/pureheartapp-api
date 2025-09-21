@@ -144,7 +144,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       
       return reply.redirect(redirectUrl);
     } catch (err) {
-      request.log.error('Google OAuth callback error:', err);
+  request.log.error({ err }, 'Google OAuth callback error');
       return reply.status(500).send({ success: false, message: 'OAuth callback failed', statusCode: 500 });
     }
   });
@@ -234,7 +234,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       
       return reply.redirect(redirectUrl);
     } catch (err) {
-      request.log.error('Apple OAuth callback error:', err);
+  request.log.error({ err }, 'Apple OAuth callback error');
       return reply.status(500).send({ success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
     }
   });
@@ -345,7 +345,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       });
     } catch (error) {
       await t.rollback();
-      request.log.error('Google login error:', error);
+  request.log.error({ err: error }, 'Google login error');
       reply.status(500).send({
         success: false,
         message: 'An error occurred during Google login.',
@@ -440,7 +440,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       });
     } catch (error) {
       await t.rollback();
-      request.log.error('Apple login error:', error);
+  request.log.error({ err: error }, 'Apple login error');
       reply.status(500).send({
         success: false,
         message: 'An error occurred during Apple login.',
@@ -530,9 +530,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
             appName: appConfig.name,
           }
         );
-        fastify.log.info('Email verification job queued', { userId: user.id });
+  fastify.log.info({ userId: user.id }, 'Email verification job queued');
       } catch (error) {
-        fastify.log.error('Failed to queue verification email', { userId: user.id, error });
+  fastify.log.error({ userId: user.id, err: error }, 'Failed to queue verification email');
       }
 
       // Queue welcome email
@@ -543,9 +543,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
           email: user.email,
           appName: appConfig.name,
         });
-        fastify.log.info('Welcome email job queued', { userId: user.id });
+  fastify.log.info({ userId: user.id }, 'Welcome email job queued');
       } catch (error) {
-        fastify.log.error('Failed to queue welcome email', { userId: user.id, error });
+  fastify.log.error({ userId: user.id, err: error }, 'Failed to queue welcome email');
       }
 
       const response: IRegisterResponse = {
@@ -557,7 +557,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(201).send(response);
 
     } catch (error) {
-      request.log.error('Registration error:', error);
+  request.log.error({ err: error }, 'Registration error');
       
       const response: IAPIResponse = {
         success: false,
@@ -668,7 +668,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Login error:', error);
+  request.log.error({ err: error }, 'Login error');
       
       const response: IAPIResponse = {
         success: false,
@@ -708,7 +708,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Logout error:', error);
+  request.log.error({ err: error }, 'Logout error');
       
       const response: IAPIResponse = {
         success: false,
@@ -777,16 +777,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
               appName: appConfig.name,
             }
           );
-          fastify.log.info('Password reset email job queued', { userId: user.id });
+          fastify.log.info({ userId: user.id }, 'Password reset email job queued');
         } catch (error) {
-          fastify.log.error('Failed to queue password reset email', { userId: user.id, error });
+          fastify.log.error({ userId: user.id, err: error }, 'Failed to queue password reset email');
         }
       }
 
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Forgot password error:', error);
+  request.log.error({ err: error }, 'Forgot password error');
       
       const response: IAPIResponse = {
         success: false,
@@ -878,7 +878,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Reset password error:', error);
+  request.log.error({ err: error }, 'Reset password error');
       
       const response: IAPIResponse = {
         success: false,
@@ -961,9 +961,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
           request.ip,
           request.headers['user-agent']
         );
-        fastify.log.info('Password changed notification job queued', { userId: user.id });
+  fastify.log.info({ userId: user.id }, 'Password changed notification job queued');
       } catch (error) {
-        fastify.log.error('Failed to queue password changed notification', { userId: user.id, error });
+  fastify.log.error({ userId: user.id, err: error }, 'Failed to queue password changed notification');
       }
 
       const response: IAPIResponse = {
@@ -975,7 +975,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Change password error:', error);
+  request.log.error({ err: error }, 'Change password error');
       
       const response: IAPIResponse = {
         success: false,
@@ -1059,7 +1059,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Email verification error:', error);
+  request.log.error({ err: error }, 'Email verification error');
       
       const response: IAPIResponse = {
         success: false,
@@ -1126,7 +1126,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Token refresh error:', error);
+  request.log.error({ err: error }, 'Token refresh error');
       
       const response: IAPIResponse = {
         success: false,
@@ -1185,7 +1185,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Get user profile error:', error);
+  request.log.error({ err: error }, 'Get user profile error');
       
       const response: IAPIResponse = {
         success: false,
@@ -1251,7 +1251,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.status(200).send(response);
 
     } catch (error) {
-      request.log.error('Get user details error:', error);
+  request.log.error({ err: error }, 'Get user details error');
       const response: IAPIResponse = {
         success: false,
         message: 'Failed to retrieve user details',
@@ -1323,7 +1323,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       });
 
     } catch (error) {
-      request.log.error('Update user profile error:', error);
+  request.log.error({ err: error }, 'Update user profile error');
       return reply.status(500).send({
         success: false,
         message: 'Failed to update user profile',

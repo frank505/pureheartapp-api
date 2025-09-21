@@ -43,7 +43,7 @@ export default async function revenuecatRoutes(fastify: FastifyInstance) {
         const r = await SubscriptionService.upsertFromRevenueCat(evt);
         results.push({ ok: true, ...r });
       } catch (e: any) {
-        fastify.log.error('RevenueCat processing error', { error: e?.message, stack: e?.stack });
+  fastify.log.error({ err: e, stack: (e as any)?.stack }, 'RevenueCat processing error');
         results.push({ ok: false, error: e?.message });
       }
     }

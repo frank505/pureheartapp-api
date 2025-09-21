@@ -28,7 +28,7 @@ export default async function dependencyRoutes(fastify: FastifyInstance) {
 				data: { score: result.score, reasoning: result.reasoning }
 			});
 		} catch (err: any) {
-			request.log.error('dependency assess error', err);
+			request.log.error({ err }, 'dependency assess error');
 			return reply.status(500).send({ success: false, message: 'Internal error', statusCode: 500, error: err?.message });
 		}
 	});

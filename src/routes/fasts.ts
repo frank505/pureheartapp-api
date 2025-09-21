@@ -192,7 +192,7 @@ export default async function fastRoutes(fastify: FastifyInstance) {
           ]);
         }
       } catch (notifyErr) {
-        request.log.error('Error notifying accountability partners on fast create:', notifyErr);
+        request.log.error({ err: notifyErr }, 'Error notifying accountability partners on fast create');
       }
     }
 

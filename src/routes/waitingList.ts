@@ -32,7 +32,7 @@ export default async function waitingListRoutes(fastify: FastifyInstance) {
         data: { email: normalizedEmail }
       });
     } catch (error) {
-      request.log.error('Error saving waiting list email:', error);
+  request.log.error({ err: error }, 'Error saving waiting list email');
       return reply.status(500).send({ success: false, message: 'Failed to save waiting list email' });
     }
   });

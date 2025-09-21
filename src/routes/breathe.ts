@@ -35,7 +35,7 @@ export default async function breatheRoutes(fastify: FastifyInstance) {
         data: result,
       });
     } catch (err: any) {
-      request.log.error('breathe/analyze error:', err);
+  request.log.error({ err }, 'breathe/analyze error');
       return reply.status(500).send({ success: false, message: 'Internal error', error: err?.message || 'error', statusCode: 500 });
     }
   });

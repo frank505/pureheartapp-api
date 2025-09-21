@@ -389,3 +389,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **May this application serve as a tool for healing and recovery in the Christian community. 🙏**
+
+## 🧾 Logging
+
+- Development: pretty logs via pino-pretty with timestamps; auth headers and passwords are redacted.
+- Production: JSON logs from Pino at level info; suitable for log aggregators.
+- Usage examples:
+
+```ts
+request.log.info({ key: 'value' }, 'message');
+request.log.error({ err }, 'something failed');
+fastify.log.warn({ context: 'startup' }, 'note');
+```
+
+Note: pino-pretty is a dev dependency and only used locally.

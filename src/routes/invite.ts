@@ -41,7 +41,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       const appStoreUrl = appConfig.appStoreUrl;
       reply.redirect(appStoreUrl);
     } catch (error) {
-      request.log.error('Error processing invitation link:', error);
+  request.log.error({ err: error }, 'Error processing invitation link');
       reply.status(500).send({
         success: false,
         message: 'An error occurred while processing the invitation link.',
@@ -92,7 +92,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           reply.send({ inviteId: null });
         }
       } catch (error) {
-        request.log.error('Error matching install:', error);
+  request.log.error({ err: error }, 'Error matching install');
         reply.status(500).send({
           success: false,
           message: 'An error occurred while matching the installation.',
@@ -202,7 +202,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           invitations: createdInvitations,
         });
       } catch (error: any) {
-        request.log.error('Error sending invitations by email:', error);
+  request.log.error({ err: error }, 'Error sending invitations by email');
         const status = (error?.statusCode === 403) ? 403 : 500;
         const msg = error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to send invitations';
         return reply.status(status).send({ success: false, message: msg });
@@ -248,7 +248,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       return reply.send({ items });
     } catch (error) {
-      request.log.error('Error fetching sent invites:', error);
+  request.log.error({ err: error }, 'Error fetching sent invites');
       return reply.status(500).send({ items: [] });
     }
   });
@@ -291,7 +291,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       return reply.send({ items });
     } catch (error) {
-      request.log.error('Error fetching received invites:', error);
+  request.log.error({ err: error }, 'Error fetching received invites');
       return reply.status(500).send({ items: [] });
     }
   });
@@ -334,7 +334,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       return reply.send({ items });
     } catch (error) {
-      request.log.error('Error fetching partners:', error);
+  request.log.error({ err: error }, 'Error fetching partners');
       return reply.status(500).send({ items: [] });
     }
   });
@@ -384,7 +384,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         statusCode: 200
       });
     } catch (error) {
-      request.log.error('Error fetching partner phone numbers:', error);
+  request.log.error({ err: error }, 'Error fetching partner phone numbers');
       return reply.status(500).send({ 
         success: false,
         message: 'Failed to retrieve partner phone numbers',
@@ -413,7 +413,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       await invitation.destroy();
       return reply.status(204).send();
     } catch (error) {
-      request.log.error('Error revoking invitation:', error);
+  request.log.error({ err: error }, 'Error revoking invitation');
       return reply.status(500).send({ success: false, message: 'Failed to revoke invitation' });
     }
   });
@@ -443,7 +443,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       });
       return reply.status(201).send({ id: created.id, hash: created.hash, phoneNumber: created.phoneNumber });
     } catch (error) {
-      request.log.error('Error saving invitation hash:', error);
+  request.log.error({ err: error }, 'Error saving invitation hash');
       return reply.status(500).send({ success: false, message: 'Failed to save invitation hash' });
     }
   });
@@ -537,7 +537,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         receiver: json?.receiver || null,
       });
     } catch (error: any) {
-      request.log.error('Error accepting invitation:', error);
+  request.log.error({ err: error }, 'Error accepting invitation');
       const status = (error?.statusCode === 403) ? 403 : 500;
       const msg = error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to accept invitation';
       return reply.status(status).send({ success: false, message: msg });
@@ -641,7 +641,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         receiver: json?.receiver || null,
       });
     } catch (error: any) {
-      request.log.error('Error accepting invitation by code:', error);
+  request.log.error({ err: error }, 'Error accepting invitation by code');
       const status = (error?.statusCode === 403) ? 403 : 500;
       const msg = error?.code === 'FEATURE_LOCKED' ? error.message : 'Failed to accept invitation';
       return reply.status(status).send({ success: false, message: msg });

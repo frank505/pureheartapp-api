@@ -47,6 +47,7 @@ import dependencyRoutes from './routes/dependency';
 import articlesRoutes from './routes/articles';
 import revenuecatRoutes from './routes/revenuecat';
 import screenshotsRoutes from './routes/screenshots';
+import adminLogsRoutes from './routes/adminLogs';
 import ARTICLES from './data/articles';
 import Article from './models/Article';
 // Ensure new models are registered before syncing
@@ -71,20 +72,84 @@ import './models/PanicReply';
  * This function sets up all plugins, middleware, and routes for the application
  */
 const createServer = async (): Promise<FastifyInstance> => {
-  // Create Fastify instance with logging configuration
-  const fastify = Fastify({
-    logger: serverConfig.NODE_ENV === 'development' ? {
-      level: 'info',
+  // Create Fastify instance with environment-specific logging configuration
+  const environment = serverConfig.NODE_ENV || 'development';
+  const commonRedactions = [
+    'req.headers.authorization',
+    'headers.authorization',
+    'body.password',
+    'body.confirmPassword',
+    'body.token',
+    'body.refreshToken',
+    'query.token',
+    'query.password',
+  ];
+
+  const logFilePath = path.join(process.cwd(), 'logs', 'all.log');
+
+  const envToLogger: Record<string, any> = {
+    development: {
+      level: 'debug',
       transport: {
-        target: 'pino-pretty',
-        options: {
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
-        }
-      }
-    } : {
-      level: 'warn'
-    }
+        // Use worker-thread transports: pretty console + file
+        targets: [
+          {
+            target: 'pino-pretty',
+            level: 'debug',
+            options: {
+              translateTime: 'HH:MM:ss Z',
+              ignore: 'pid,hostname',
+            },
+          },
+          {
+            target: 'pino/file',
+            level: 'debug',
+            options: {
+              destination: logFilePath,
+              mkdir: true,
+            },
+          },
+        ],
+      },
+      redact: commonRedactions,
+      serializers: {
+        req(request: any) {
+          return {
+            method: request.method,
+            url: request.url,
+            path: request.routeOptions?.url,
+            parameters: request.params,
+          };
+        },
+        res(reply: any) {
+          return {
+            statusCode: reply.statusCode,
+          };
+        },
+      },
+    },
+    production: {
+      level: 'info',
+      redact: commonRedactions,
+      // Write JSON logs to file using worker thread
+      transport: {
+        targets: [
+          {
+            target: 'pino/file',
+            level: 'info',
+            options: {
+              destination: logFilePath,
+              mkdir: true,
+            },
+          },
+        ],
+      },
+    },
+    test: false,
+  };
+
+  const fastify = Fastify({
+    logger: envToLogger[environment] ?? true,
   });
 
   // Register security plugin (helmet) - must be first for security headers
@@ -114,6 +179,16 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(jwt, {
     secret: jwtConfig.secret,
   });
+
+  // In development, log parsed request bodies (avoid in production for privacy)
+  if (serverConfig.NODE_ENV === 'development') {
+    fastify.addHook('preHandler', (req, _reply, done) => {
+      if ((req as any).body) {
+        req.log.debug({ body: (req as any).body }, 'parsed body');
+      }
+      done();
+    });
+  }
 
 
   // Register Redis plugin
@@ -267,14 +342,14 @@ const createServer = async (): Promise<FastifyInstance> => {
       await testDatabaseConnection();
       health.services.database = true;
     } catch (error) {
-      fastify.log.error('Database health check failed:', error);
+      fastify.log.error({ err: error }, 'Database health check failed');
     }
 
     try {
       // Check Redis connection
       health.services.redis = await checkRedisHealth(fastify.redis);
     } catch (error) {
-      fastify.log.error('Redis health check failed:', error);
+      fastify.log.error({ err: error }, 'Redis health check failed');
     }
 
     try {
@@ -282,7 +357,7 @@ const createServer = async (): Promise<FastifyInstance> => {
       const queueHealth = await checkQueueHealth();
       health.services.queues = queueHealth.status === 'healthy';
     } catch (error) {
-      fastify.log.error('Queue health check failed:', error);
+      fastify.log.error({ err: error }, 'Queue health check failed');
     }
 
     const allServicesHealthy = health.services.database && health.services.redis && health.services.queues;
@@ -343,6 +418,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(articlesRoutes, { prefix: '/api' });
   await fastify.register(revenuecatRoutes, { prefix: '/api' });
   await fastify.register(screenshotsRoutes, { prefix: '/api' });
+  await fastify.register(adminLogsRoutes);
 
   // Add graceful shutdown hooks
   const gracefulCloseHandler = {
@@ -380,7 +456,7 @@ const createServer = async (): Promise<FastifyInstance> => {
         
         process.exit(0);
       } catch (error) {
-        fastify.log.error('Error during graceful shutdown:', error);
+        fastify.log.error({ err: error }, 'Error during graceful shutdown');
         process.exit(1);
       }
     }
