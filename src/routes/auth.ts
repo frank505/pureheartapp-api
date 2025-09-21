@@ -131,12 +131,12 @@ export default async function authRoutes(fastify: FastifyInstance) {
       let redirectUrl: string;
       if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
         // Standard HTTP URL - use URL constructo
-      redirectUrl =  baseUri+"?ourownjwttoken="+encodeURIComponent(tokens.accessToken);
+      redirectUrl =  baseUri+"?helloworld=hello&ourownjwttoken="+encodeURIComponent(tokens.accessToken);
         if (state) {
           redirectUrl = redirectUrl + "&state=" + encodeURIComponent(String(state));
         }
       } else {
-        redirectUrl = `${baseUri}?ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
+        redirectUrl = `${baseUri}?helloworld=hello&ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
         if (state) {
           redirectUrl += `&state=${encodeURIComponent(String(state))}`;
         }
