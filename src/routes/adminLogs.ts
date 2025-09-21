@@ -41,18 +41,19 @@ export default async function adminLogsRoutes(fastify: FastifyInstance) {
     input,select{background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:6px 10px}
     #container{padding:12px}
     #log{white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b1020;border:1px solid #1f2937;border-radius:8px;padding:12px;height:70vh;overflow:auto}
-    .line{padding:2px 0}
+    .line{padding:2px 0; border-bottom:1px solid #1f2937;}
     .info{color:#93c5fd}
     .warn{color:#fbbf24}
     .error{color:#f87171}
     .debug{color:#a78bfa}
     .fatal{color:#fb7185}
     .trace{color:#34d399}
+    .request{color:#10b981; font-weight:500}
   </style>
 </head>
 <body>
 <header>
-  <strong>Logs</strong>
+  <strong>Server Logs</strong>
   <label>Level <select id="level">
     <option value="">All</option>
     <option>fatal</option>
@@ -65,7 +66,7 @@ export default async function adminLogsRoutes(fastify: FastifyInstance) {
   <label>Search <input id="search" placeholder="text or JSON" /></label>
   <button id="pause">Pause</button>
   <button id="clear">Clear</button>
-  <span id="status" style="margin-left:auto;opacity:.7"></span>
+  <span id="status" style="margin-left:auto;opacity:.7">connecting...</span>
 </header>
 <div id="container">
   <div id="log"></div>
@@ -81,18 +82,50 @@ export default async function adminLogsRoutes(fastify: FastifyInstance) {
 
   function renderLine(obj, raw){
     const div = document.createElement('div');
-    const lvl = obj && obj.levelName ? obj.levelName : (obj && obj.level) || 'info';
+    let lvl = 'info';
+    let time = '';
+    let msg = raw;
+    let reqInfo = '';
+    
+    if (obj) {
+      const levelMap = {60:'fatal',50:'error',40:'warn',30:'info',20:'debug',10:'trace'};
+      lvl = obj.levelName || levelMap[obj.level] || 'info';
+      time = obj.time ? new Date(obj.time).toLocaleTimeString() : '';
+      msg = obj.msg || raw;
+      
+      if (obj.req) {
+        reqInfo = ' [' + obj.req.method + ' ' + obj.req.url + ']';
+        if (obj.req.parameters && Object.keys(obj.req.parameters).length) {
+          reqInfo += ' params: ' + JSON.stringify(obj.req.parameters);
+        }
+        div.classList.add('request');
+      }
+      
+      if (obj.res) {
+        reqInfo += ' → ' + obj.res.statusCode;
+        if (obj.responseTime) {
+          reqInfo += ' (' + Math.round(obj.responseTime) + 'ms)';
+        }
+      }
+      
+      if (obj.err) {
+        msg += ' ERROR: ' + (obj.err.message || obj.err);
+        if (obj.err.stack) {
+          msg += '\n' + obj.err.stack;
+        }
+      }
+    }
+    
     div.className = 'line ' + lvl;
-    const time = obj && obj.time ? new Date(obj.time).toISOString() : '';
-    const msg = obj && obj.msg ? obj.msg : raw;
-    div.textContent = '[' + time + '] ' + lvl.toUpperCase() + ': ' + msg;
+    div.textContent = '[' + time + '] ' + lvl.toUpperCase() + ': ' + msg + reqInfo;
     return div;
   }
 
   function passesFilters(obj, raw){
     const lvlFilter = levelSel.value;
     if (lvlFilter){
-      const lvl = obj && obj.levelName ? obj.levelName : (obj && obj.level) || '';
+      const levelMap = {60:'fatal',50:'error',40:'warn',30:'info',20:'debug',10:'trace'};
+      const lvl = obj && (obj.levelName || levelMap[obj.level]) || 'info';
       if (lvl !== lvlFilter) return false;
     }
     const q = searchEl.value.trim();
@@ -105,26 +138,38 @@ export default async function adminLogsRoutes(fastify: FastifyInstance) {
 
   let es;
   function connect(){
+    if (es) es.close();
     es = new EventSource('/admin/logs/stream');
     statusEl.textContent = 'live';
     es.onmessage = (e)=>{
       if (paused) return;
       const raw = e.data;
       let obj = null;
-      try{ obj = JSON.parse(raw); if (obj.level && !obj.levelName){
-        const map={60:'fatal',50:'error',40:'warn',30:'info',20:'debug',10:'trace'}; obj.levelName = map[obj.level] || obj.level; }
+      try{ 
+        obj = JSON.parse(raw); 
+        if (obj.level && !obj.levelName){
+          const map={60:'fatal',50:'error',40:'warn',30:'info',20:'debug',10:'trace'}; 
+          obj.levelName = map[obj.level] || obj.level; 
+        }
       }catch(_){ }
       if (!passesFilters(obj, raw)) return;
       const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 10;
       logEl.appendChild(renderLine(obj, raw));
       if (atBottom) logEl.scrollTop = logEl.scrollHeight;
     };
-    es.onerror = ()=>{ statusEl.textContent = 'reconnecting...'; setTimeout(()=>{ es.close(); connect(); }, 1000); };
+    es.onerror = ()=>{ 
+      statusEl.textContent = 'reconnecting...'; 
+      setTimeout(()=>{ connect(); }, 2000); 
+    };
+    es.onopen = ()=>{ statusEl.textContent = 'live'; };
   }
   connect();
 
   pauseBtn.onclick = ()=>{ paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; };
   clearBtn.onclick = ()=>{ logEl.innerHTML = ''; };
+  
+  levelSel.onchange = ()=>{ logEl.innerHTML = ''; connect(); };
+  searchEl.oninput = ()=>{ logEl.innerHTML = ''; connect(); };
 </script>
 </body>
 </html>`;
@@ -142,42 +187,68 @@ export default async function adminLogsRoutes(fastify: FastifyInstance) {
       'X-Accel-Buffering': 'no'
     });
 
-    const stream = fs.createReadStream(LOG_FILE, { encoding: 'utf8', flags: 'a+', start: 0 });
-    const watcher = fs.watch(LOG_FILE, { persistent: true });
-
     function send(line: string){
-      reply.raw.write(`data: ${line.replace(/\n/g, '')}\n\n`);
+      if (line.trim()) {
+        reply.raw.write(`data: ${line.replace(/\n/g, '').replace(/\r/g, '')}\n\n`);
+      }
     }
 
-    let buffer = '';
-    stream.on('data', (chunk) => {
-      buffer += chunk;
-      let idx;
-      while((idx = buffer.indexOf('\n')) >= 0){
-        const line = buffer.slice(0, idx);
-        buffer = buffer.slice(idx+1);
-        if (line) send(line);
+    // Read existing logs first
+    try {
+      const content = fs.readFileSync(LOG_FILE, 'utf8');
+      const lines = content.split('\n').filter(Boolean);
+      // Send last 100 lines to start
+      lines.slice(-100).forEach(line => send(line));
+    } catch (err) {
+      console.log('Error reading initial log content:', err);
+    }
+
+    // Watch for new lines
+    let lastSize = 0;
+    try {
+      lastSize = fs.statSync(LOG_FILE).size;
+    } catch (err) {
+      lastSize = 0;
+    }
+
+    const watcher = fs.watchFile(LOG_FILE, { interval: 500 }, (curr, prev) => {
+      if (curr.size > lastSize) {
+        // File grew, read new content
+        const stream = fs.createReadStream(LOG_FILE, { 
+          encoding: 'utf8', 
+          start: lastSize,
+          end: curr.size - 1
+        });
+        
+        let buffer = '';
+        stream.on('data', (chunk) => {
+          buffer += chunk;
+          let idx;
+          while((idx = buffer.indexOf('\n')) >= 0){
+            const line = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 1);
+            if (line) send(line);
+          }
+        });
+        
+        lastSize = curr.size;
       }
     });
 
-    watcher.on('change', () => {
-      // Tail new data
-      fs.readFile(LOG_FILE, 'utf8', (err, data) => {
-        if (err) return;
-        const lines = data.split('\n');
-        const last = lines.slice(-50).filter(Boolean);
-        last.forEach(l => send(l));
-      });
-    });
-
     request.raw.on('close', () => {
-      stream.close();
-      watcher.close();
+      fs.unwatchFile(LOG_FILE);
       reply.raw.end();
     });
 
-    // Send a heartbeat
-    const interval = setInterval(() => reply.raw.write(': ping\n\n'), 15000);
+    // Send a heartbeat every 30 seconds
+    const interval = setInterval(() => {
+      try {
+        reply.raw.write(': heartbeat\n\n');
+      } catch (err) {
+        clearInterval(interval);
+      }
+    }, 30000);
+    
     request.raw.on('close', () => clearInterval(interval));
   });
 }
