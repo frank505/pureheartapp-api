@@ -127,15 +127,27 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
       // Build deep link redirect
       const baseUri = appConfig.oauthRedirectUri || 'pureheart://auth/callback';
-      const url = new URL(baseUri);
-      url.searchParams.set('ourownjwttoken', tokens.accessToken);
       
-      // Optionally carry through state
-      if (state) {
-        url.searchParams.set('state', String(state));
+      // Handle deep link URLs properly - they don't support URL constructor the same way
+      let redirectUrl: string;
+      if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
+        // Standard HTTP URL - use URL constructor
+        const url = new URL(baseUri);
+        url.searchParams.set('ourownjwttoken', tokens.accessToken);
+        if (state) {
+          url.searchParams.set('state', String(state));
+        }
+        redirectUrl = url.toString();
+      } else {
+        // Deep link URL - construct manually
+        const separator = baseUri.includes('?') ? '&' : '?';
+        redirectUrl = `${baseUri}${separator}ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
+        if (state) {
+          redirectUrl += `&state=${encodeURIComponent(String(state))}`;
+        }
       }
       
-      return reply.redirect(url.toString());
+      return reply.redirect(redirectUrl);
     } catch (err) {
       request.log.error('Google OAuth callback error:', err);
       return reply.status(500).send({ success: false, message: 'OAuth callback failed', statusCode: 500 });
@@ -205,15 +217,27 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
       // Build deep link redirect
       const baseUri = appConfig.oauthRedirectUri || 'pureheart://auth/callback';
-      const url = new URL(baseUri);
-      url.searchParams.set('ourownjwttoken', tokens.accessToken);
       
-      // Optionally carry through state
-      if (state) {
-        url.searchParams.set('state', String(state));
+      // Handle deep link URLs properly - they don't support URL constructor the same way
+      let redirectUrl: string;
+      if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
+        // Standard HTTP URL - use URL constructor
+        const url = new URL(baseUri);
+        url.searchParams.set('ourownjwttoken', tokens.accessToken);
+        if (state) {
+          url.searchParams.set('state', String(state));
+        }
+        redirectUrl = url.toString();
+      } else {
+        // Deep link URL - construct manually
+        const separator = baseUri.includes('?') ? '&' : '?';
+        redirectUrl = `${baseUri}${separator}ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
+        if (state) {
+          redirectUrl += `&state=${encodeURIComponent(String(state))}`;
+        }
       }
       
-      return reply.redirect(url.toString());
+      return reply.redirect(redirectUrl);
     } catch (err) {
       request.log.error('Apple OAuth callback error:', err);
       return reply.status(500).send({ success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
