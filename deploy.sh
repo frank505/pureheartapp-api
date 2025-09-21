@@ -348,35 +348,35 @@ manage_pm2_process() {
 # Show PM2 status
 show_pm2_status() {
     print_info "Current PM2 processes:"
-    pm2 list || true
-    
-    print_info "PM2 logs (last 15 lines):"
-    pm2 logs --lines 15 || true
+    timeout 10 pm2 list || print_warning "PM2 list timed out, but this is not critical"
     
     print_info "Application status check:"
     local app_name="christian-recovery-app"
     
-    # Use a more robust check for the application status
+    # Use a more robust and faster check for the application status
     local pm2_status
-    pm2_status=$(pm2 list | grep "$app_name" | grep -c "online" || echo "0")
+    pm2_status=$(timeout 5 pm2 list 2>/dev/null | grep "$app_name" | grep -c "online" 2>/dev/null || echo "0")
     
     if [ "$pm2_status" -gt 0 ]; then
         print_status "Application is running successfully"
         
-        # Show application-specific logs
-        print_info "Recent application logs:"
-        pm2 logs "$app_name" --lines 10 || true
+        # Show brief application-specific logs with timeout
+        print_info "Recent application logs (last 5 lines):"
+        timeout 10 pm2 logs "$app_name" --lines 5 2>/dev/null || print_warning "Log retrieval timed out, but app is running"
     else
-        print_warning "Application status could not be verified or app is not running"
-        print_info "Full PM2 status:"
-        pm2 list || true
+        # Quick fallback check
+        print_info "Performing direct process check..."
+        local process_count
+        process_count=$(pgrep -f "christian-recovery-app" | wc -l || echo "0")
         
-        print_info "Error logs:"
-        pm2 logs "$app_name" --lines 20 --err || true
-        
-        # Don't fail the deployment if PM2 list/logs have issues, just warn
-        print_warning "Status check had issues, but deployment may have succeeded. Check manually."
+        if [ "$process_count" -gt 0 ]; then
+            print_status "Application processes are running (found $process_count processes)"
+        else
+            print_warning "Application status could not be verified, but deployment completed"
+        fi
     fi
+    
+    print_status "Status check completed - deployment process finished"
 }
 
 # Main deployment function
