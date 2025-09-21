@@ -154,6 +154,10 @@ check_pm2() {
     
     if command_exists pm2; then
         print_status "PM2 is installed ($(pm2 --version))"
+        
+        # Update PM2 to resolve version mismatch warnings
+        print_info "Updating PM2 to resolve version mismatches..."
+        pm2 update || print_warning "PM2 update failed, continuing anyway..."
     else
         print_error "PM2 is not installed. Installing..."
         npm install -g pm2
@@ -301,15 +305,21 @@ manage_pm2_process() {
     
     if pm2 list | grep -q "$app_name"; then
         print_info "Stopping existing PM2 process..."
-        pm2 delete "$app_name"
+        pm2 delete "$app_name" || print_warning "Failed to delete existing process, continuing..."
         sleep 2
         
         print_info "Starting PM2 process with new environment..."
-        pm2 start ecosystem.config.js --env production --update-env
+        pm2 start ecosystem.config.js --env production --update-env || {
+            print_error "Failed to start PM2 process"
+            return 1
+        }
         print_status "PM2 process started with updated environment"
     else
         print_info "Starting new PM2 process..."
-        pm2 start ecosystem.config.js --env production
+        pm2 start ecosystem.config.js --env production || {
+            print_error "Failed to start PM2 process"
+            return 1
+        }
         print_status "PM2 process started"
     fi
     
@@ -322,26 +332,26 @@ manage_pm2_process() {
     else
         print_error "PM2 process failed to start properly. Checking logs..."
         print_info "Recent error logs:"
-        pm2 logs "$app_name" --lines 20 --err
+        pm2 logs "$app_name" --lines 20 --err || true
         
         print_info "Recent output logs:"
-        pm2 logs "$app_name" --lines 10 --out
+        pm2 logs "$app_name" --lines 10 --out || true
         
         return 1
     fi
     
     # Save PM2 process list
-    pm2 save
+    pm2 save || print_warning "Failed to save PM2 process list, continuing..."
     print_status "PM2 process list saved"
 }
 
 # Show PM2 status
 show_pm2_status() {
     print_info "Current PM2 processes:"
-    pm2 list
+    pm2 list || true
     
     print_info "PM2 logs (last 15 lines):"
-    pm2 logs --lines 15
+    pm2 logs --lines 15 || true
     
     print_info "Application status check:"
     local app_name="christian-recovery-app"
@@ -350,11 +360,12 @@ show_pm2_status() {
         
         # Show application-specific logs
         print_info "Recent application logs:"
-        pm2 logs "$app_name" --lines 10
+        pm2 logs "$app_name" --lines 10 || true
     else
         print_error "Application is not running properly"
         print_info "Error logs:"
-        pm2 logs "$app_name" --lines 20 --err
+        pm2 logs "$app_name" --lines 20 --err || true
+        return 1
     fi
 }
 
