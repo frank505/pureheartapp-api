@@ -56,7 +56,8 @@ interface EnvironmentConfig {
   GOOGLE_REDIRECT_URI?: string;
 
   // Apple OAuth Configuration
-  APPLE_CLIENT_ID?: string;
+  APPLE_CLIENT_ID?: string; // Bundle ID for iOS/native apps
+  APPLE_SERVICE_ID?: string; // Service ID for web authentication
   APPLE_TEAM_ID?: string;
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
@@ -166,6 +167,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
 
   APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
+  APPLE_SERVICE_ID: process.env.APPLE_SERVICE_ID,
   APPLE_TEAM_ID: process.env.APPLE_TEAM_ID,
   APPLE_KEY_ID: process.env.APPLE_KEY_ID,
   APPLE_PRIVATE_KEY: process.env.APPLE_PRIVATE_KEY,
@@ -255,7 +257,8 @@ export const googleConfig = {
 };
 
 export const appleConfig = {
-  clientId: config.APPLE_CLIENT_ID,
+  clientId: config.APPLE_CLIENT_ID, // Bundle ID for native apps
+  serviceId: config.APPLE_SERVICE_ID, // Service ID for web apps
   teamId: config.APPLE_TEAM_ID,
   keyId: config.APPLE_KEY_ID,
   privateKey: config.APPLE_PRIVATE_KEY,

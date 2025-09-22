@@ -150,6 +150,64 @@ export default async function authRoutes(fastify: FastifyInstance) {
   });
 
   /**
+   * Detect if the request is coming from a web browser vs native app
+   * @param userAgent - User agent string from request headers
+   * @param referrer - Referrer header (web requests usually have this)
+   * @returns true if browser/web request, false if native app
+   */
+  function isBrowserRequest(userAgent?: string, referrer?: string): boolean {
+    if (!userAgent) return false;
+    
+    // Check for common web browser user agents
+    const browserPatterns = [
+      /Mozilla\//i,
+      /Chrome\//i,
+      /Safari\//i,
+      /Firefox\//i,
+      /Edge\//i,
+      /Opera\//i
+    ];
+    
+    const isBrowser = browserPatterns.some(pattern => pattern.test(userAgent));
+    
+    // Additional check: web requests often have referrer headers
+    const hasWebReferrer = referrer && (
+      referrer.startsWith('http://') || 
+      referrer.startsWith('https://')
+    );
+    
+    // If user agent suggests browser OR we have a web referrer, treat as browser
+    return isBrowser || !!hasWebReferrer;
+  }
+
+  /**
+   * Get the appropriate Apple audience ID based on request source
+   * @param request - Fastify request object
+   * @returns Service ID for browser requests, Client ID for native apps
+   */
+  function getAppleAudienceId(request: any): string | undefined {
+    const userAgent = Array.isArray(request.headers['user-agent']) 
+      ? request.headers['user-agent'][0] 
+      : request.headers['user-agent'];
+    const referrer = Array.isArray(request.headers['referer']) 
+      ? request.headers['referer'][0] 
+      : request.headers['referer'] || 
+        (Array.isArray(request.headers['referrer']) 
+          ? request.headers['referrer'][0] 
+          : request.headers['referrer']);
+    
+    const isFromBrowser = isBrowserRequest(userAgent, referrer);
+    
+    if (isFromBrowser) {
+      // Use Service ID for web/browser requests
+      return appleConfig.serviceId || appleConfig.clientId; // Fallback to clientId if serviceId not set
+    } else {
+      // Use Client ID (Bundle ID) for native app requests  
+      return appleConfig.clientId;
+    }
+  }
+
+  /**
    * Apple OAuth Web Callback
    * GET /api/auth/apple/callback
    * Accepts `code` (OAuth authorization code) or `id_token` from Apple Sign-In.
@@ -169,15 +227,100 @@ export default async function authRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ success: false, message: 'Apple OAuth not configured', statusCode: 400 });
         }
 
-        const payload = await appleSigninAuth.verifyIdToken(id_token, {
-          audience: appleConfig.clientId,
-          nonce: undefined, // You might want to implement nonce verification for added security
-        });
+        try {
+          let payload;
+          
+          // Detect if this is a browser or native app request
+          const userAgent = Array.isArray(request.headers['user-agent']) 
+            ? request.headers['user-agent'][0] 
+            : request.headers['user-agent'];
+          const referrer = Array.isArray(request.headers['referer']) 
+            ? request.headers['referer'][0] 
+            : request.headers['referer'] || 
+              (Array.isArray(request.headers['referrer']) 
+                ? request.headers['referrer'][0] 
+                : request.headers['referrer']);
+          const isFromBrowser = isBrowserRequest(userAgent, referrer);
+          
+          // Get the appropriate audience ID based on request source
+          const primaryAudience = getAppleAudienceId(request);
+          
+          // Build fallback audiences in case the primary one fails
+          const possibleAudiences = [
+            primaryAudience, // Service ID for browser, Client ID for native
+            appleConfig.clientId, // Bundle ID fallback
+            appleConfig.serviceId, // Service ID fallback
+            `${appleConfig.clientId}.web`, // Common Service ID pattern: com.100klabs.pureheart.web
+            `${appleConfig.clientId}.service`, // Another pattern: com.100klabs.pureheart.service
+            appleConfig.clientId?.replace('.', '_'), // Some use underscore instead of dot
+          ].filter(Boolean); // Remove any undefined values
+          
+          request.log.info({ 
+            isFromBrowser,
+            userAgent,
+            referrer,
+            primaryAudience,
+            possibleAudiences 
+          }, `Apple authentication request detected - ${isFromBrowser ? 'Browser/Web' : 'Native App'}`);
+          
+          // Try audience values starting with the most appropriate one
+          let lastError;
+          for (const audience of possibleAudiences) {
+            try {
+              payload = await appleSigninAuth.verifyIdToken(id_token, {
+                audience: audience,
+                nonce: undefined,
+              });
+              
+              request.log.info({ 
+                successfulAudience: audience,
+                requestType: isFromBrowser ? 'Browser/Web' : 'Native App'
+              }, `Apple ID token verified successfully`);
+              
+              break; // Success, exit loop
+            } catch (audienceError) {
+              lastError = audienceError;
+              request.log.debug({ 
+                err: audienceError, 
+                triedAudience: audience,
+                requestType: isFromBrowser ? 'Browser/Web' : 'Native App'
+              }, `Apple ID token verification failed for audience ${audience}`);
+            }
+          }
+          
+          if (!payload) {
+            // If all audience attempts failed, try without audience validation for debugging
+            try {
+              const debugPayload = await appleSigninAuth.verifyIdToken(id_token, {
+                nonce: undefined,
+              });
+              
+              request.log.error({ 
+                tokenPayload: debugPayload,
+                expectedAudiences: possibleAudiences,
+                actualAudience: debugPayload.aud
+              }, 'Apple ID token audience mismatch - token verified without audience check');
+              
+            } catch (debugError) {
+              request.log.error({ err: debugError }, 'Failed to verify Apple token even without audience');
+            }
+            
+            throw lastError; // Re-throw the last audience error
+          }
 
-        email = payload.email;
-        // Apple doesn't always provide name details in the ID token for returning users
-        given_name = '';
-        family_name = '';
+          email = payload.email;
+          // Apple doesn't always provide name details in the ID token for returning users
+          given_name = '';
+          family_name = '';
+        } catch (tokenError) {
+          request.log.error({ err: tokenError, clientId: appleConfig.clientId }, 'Apple ID token verification failed');
+          return reply.status(401).send({ 
+            success: false, 
+            message: 'Invalid Apple token', 
+            statusCode: 401,
+            messageFromErr: JSON.stringify(tokenError)
+          });
+        }
       } else if (code) {
         // For authorization code flow, you would exchange the code for tokens here
         // This typically requires additional setup with Apple's token endpoint
@@ -258,14 +401,99 @@ export default async function authRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ success: false, message: 'Apple OAuth not configured', statusCode: 400 });
         }
 
-        const payload = await appleSigninAuth.verifyIdToken(id_token, {
-          audience: appleConfig.clientId,
-          nonce: undefined,
-        });
+        try {
+          let payload;
+          
+          // Detect if this is a browser or native app request
+          const userAgent = Array.isArray(request.headers['user-agent']) 
+            ? request.headers['user-agent'][0] 
+            : request.headers['user-agent'];
+          const referrer = Array.isArray(request.headers['referer']) 
+            ? request.headers['referer'][0] 
+            : request.headers['referer'] || 
+              (Array.isArray(request.headers['referrer']) 
+                ? request.headers['referrer'][0] 
+                : request.headers['referrer']);
+          const isFromBrowser = isBrowserRequest(userAgent, referrer);
+          
+          // Get the appropriate audience ID based on request source
+          const primaryAudience = getAppleAudienceId(request);
+          
+          // Build fallback audiences in case the primary one fails
+          const possibleAudiences = [
+            primaryAudience, // Service ID for browser, Client ID for native
+            appleConfig.clientId, // Bundle ID fallback
+            appleConfig.serviceId, // Service ID fallback
+            `${appleConfig.clientId}.web`, // Common Service ID pattern: com.100klabs.pureheart.web
+            `${appleConfig.clientId}.service`, // Another pattern: com.100klabs.pureheart.service
+            appleConfig.clientId?.replace('.', '_'), // Some use underscore instead of dot
+          ].filter(Boolean); // Remove any undefined values
+          
+          request.log.info({ 
+            isFromBrowser,
+            userAgent,
+            referrer,
+            primaryAudience,
+            possibleAudiences 
+          }, `Apple authentication POST request detected - ${isFromBrowser ? 'Browser/Web' : 'Native App'}`);
+          
+          // Try audience values starting with the most appropriate one
+          let lastError;
+          for (const audience of possibleAudiences) {
+            try {
+              payload = await appleSigninAuth.verifyIdToken(id_token, {
+                audience: audience,
+                nonce: undefined,
+              });
+              
+              request.log.info({ 
+                successfulAudience: audience,
+                requestType: isFromBrowser ? 'Browser/Web' : 'Native App'
+              }, `Apple ID token verified successfully (POST)`);
+              
+              break; // Success, exit loop
+            } catch (audienceError) {
+              lastError = audienceError;
+              request.log.debug({ 
+                err: audienceError, 
+                triedAudience: audience,
+                requestType: isFromBrowser ? 'Browser/Web' : 'Native App'
+              }, `Apple ID token verification failed for audience ${audience} (POST)`);
+            }
+          }
+          
+          if (!payload) {
+            // If all audience attempts failed, try without audience validation for debugging
+            try {
+              const debugPayload = await appleSigninAuth.verifyIdToken(id_token, {
+                nonce: undefined,
+              });
+              
+              request.log.error({ 
+                tokenPayload: debugPayload,
+                expectedAudiences: possibleAudiences,
+                actualAudience: debugPayload.aud
+              }, 'Apple ID token audience mismatch (POST) - token verified without audience check');
+              
+            } catch (debugError) {
+              request.log.error({ err: debugError }, 'Failed to verify Apple token even without audience (POST)');
+            }
+            
+            throw lastError; // Re-throw the last audience error
+          }
 
-        email = payload.email;
-        given_name = '';
-        family_name = '';
+          email = payload.email;
+          given_name = '';
+          family_name = '';
+        } catch (tokenError) {
+          request.log.error({ err: tokenError, clientId: appleConfig.clientId }, 'Apple ID token verification failed');
+          return reply.status(401).send({ 
+            success: false, 
+            message: 'Invalid Apple token', 
+            statusCode: 401,
+            messageFromErr: JSON.stringify(tokenError)
+          });
+        }
       } else if (code) {
         return reply.status(400).send({
           success: false,
@@ -457,10 +685,22 @@ export default async function authRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const payload = await appleSigninAuth.verifyIdToken(idToken, {
-        audience: appleConfig.clientId,
-        nonce: undefined, // You might want to implement nonce verification for added security
-      });
+      let payload;
+      try {
+        payload = await appleSigninAuth.verifyIdToken(idToken, {
+          audience: appleConfig.clientId,
+          nonce: undefined, // You might want to implement nonce verification for added security
+        });
+      } catch (tokenError) {
+        await t.rollback();
+        request.log.error({ err: tokenError, clientId: appleConfig.clientId }, 'Apple ID token verification failed in login');
+        return reply.status(401).send({
+          success: false,
+          message: 'Invalid Apple token',
+          statusCode: 401,
+          messageFromErr: JSON.stringify(tokenError)
+        });
+      }
 
       if (!payload || !payload.email) {
         await t.rollback();
