@@ -314,7 +314,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.redirect(303, redirectUrl);
     } catch (err) {
       request.log.error({ err }, 'Apple OAuth callback (POST) error');
-      return reply.status(500).send({ success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
+      console.log("error on apple authentication", { err });
+      return reply.status(500).send({ 
+        messageFromErr: JSON.stringify(err),
+        success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
     }
   });
 
