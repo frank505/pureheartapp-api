@@ -31,6 +31,7 @@
     "@bull-board/fastify": "^5.10.2",
     "@bull-board/ui": "^5.10.2",
     "@fastify/cors": "^8.4.0",
+    "@fastify/formbody": "^8.0.2",
     "@fastify/helmet": "^11.1.1",
     "@fastify/jwt": "^7.2.4",
     "@fastify/redis": "^6.1.1",

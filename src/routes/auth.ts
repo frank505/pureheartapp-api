@@ -240,6 +240,85 @@ export default async function authRoutes(fastify: FastifyInstance) {
   });
 
   /**
+   * Apple OAuth Web Callback (POST form_post)
+   * POST /api/auth/apple/callback
+   * Apple often returns to the callback via POST with application/x-www-form-urlencoded
+   * when using response_mode=form_post. Mirror the GET logic but read from body.
+   */
+  fastify.post('/apple/callback', async (request, reply) => {
+    try {
+      const { code, id_token, state } = (request as any).body || {};
+
+      let email: string | undefined;
+      let given_name = '';
+      let family_name = '';
+
+      if (id_token) {
+        if (!appleConfig.clientId) {
+          return reply.status(400).send({ success: false, message: 'Apple OAuth not configured', statusCode: 400 });
+        }
+
+        const payload = await appleSigninAuth.verifyIdToken(id_token, {
+          audience: appleConfig.clientId,
+          nonce: undefined,
+        });
+
+        email = payload.email;
+        given_name = '';
+        family_name = '';
+      } else if (code) {
+        return reply.status(400).send({
+          success: false,
+          message: 'Authorization code flow not implemented. Use id_token instead.',
+          statusCode: 400,
+        });
+      } else {
+        return reply.status(400).send({ success: false, message: 'Missing code or id_token', statusCode: 400 });
+      }
+
+      if (!email) {
+        return reply.status(401).send({ success: false, message: 'Invalid Apple token', statusCode: 401 });
+      }
+
+      let user = await User.findByEmail(email);
+      if (!user) {
+        const username = await User.generateUniqueUsername(given_name, family_name);
+        user = await User.create({
+          email,
+          firstName: given_name || 'Apple',
+          lastName: family_name || 'User',
+          username,
+          isEmailVerified: true,
+        });
+      }
+
+      const tokens = generateTokens(user!.toPublicJSON());
+
+      const baseUri = appConfig.oauthRedirectUri || 'pureheart://auth/callback';
+      let redirectUrl: string;
+      if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
+        const url = new URL(baseUri);
+        url.searchParams.set('ourownjwttoken', tokens.accessToken);
+        if (state) {
+          url.searchParams.set('state', String(state));
+        }
+        redirectUrl = url.toString();
+      } else {
+        const separator = baseUri.includes('?') ? '&' : '?';
+        redirectUrl = `${baseUri}${separator}ourownjwttoken=${encodeURIComponent(tokens.accessToken)}`;
+        if (state) {
+          redirectUrl += `&state=${encodeURIComponent(String(state))}`;
+        }
+      }
+
+      return reply.redirect(303, redirectUrl);
+    } catch (err) {
+      request.log.error({ err }, 'Apple OAuth callback (POST) error');
+      return reply.status(500).send({ success: false, message: 'Apple OAuth callback failed', statusCode: 500 });
+    }
+  });
+
+  /**
    * Google Login Endpoint
    * POST /api/auth/google-login
    * 

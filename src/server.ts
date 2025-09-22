@@ -4,6 +4,7 @@ import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import redis from '@fastify/redis';
 import fastifyStatic from '@fastify/static';
+import formbody from '@fastify/formbody';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { FastifyAdapter } from '@bull-board/fastify';
@@ -179,6 +180,9 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(jwt, {
     secret: jwtConfig.secret,
   });
+
+  // Parse application/x-www-form-urlencoded bodies (Apple form_post callbacks)
+  await fastify.register(formbody);
 
   // In development, log parsed request bodies (avoid in production for privacy)
   if (serverConfig.NODE_ENV === 'development') {
