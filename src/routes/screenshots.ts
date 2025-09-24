@@ -28,6 +28,14 @@ export default async function screenshotsRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ success: false, message: 'images[] required', statusCode: 400 } as IAPIResponse);
     }
     const analysis = await analyzeImages(images);
+    
+    // Only save suspicious or explicit images - delete clean images immediately
+    if (analysis.status === 'clean') {
+      // Clean images are not saved, just return the analysis result
+      return reply.status(200).send({ success: true, message: 'Analyzed - Clean image not saved', statusCode: 200, data: { id: null, status: analysis.status, findings: analysis.findings } } as IAPIResponse);
+    }
+    
+    // Save only suspicious or explicit images
     const created = await SensitiveImage.create({ userId, status: analysis.status, summary: analysis.summary, rawMeta: { imagesCount: images.length } as any } as any);
     if (analysis.findings?.length) {
       await SensitiveImageFinding.bulkCreate(analysis.findings.map(f => ({ imageId: created.id, label: f.label, category: f.category || null, score: f.score ?? null, raw: f.raw ?? null })) as any);
