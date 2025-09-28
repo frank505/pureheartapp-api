@@ -29,9 +29,20 @@ export default async function screenshotsRoutes(fastify: FastifyInstance) {
     }
     const analysis = await analyzeImages(images);
     
-    // Only save suspicious or explicit images - delete clean images immediately
+    // Only save suspicious or explicit images - clean images are analyzed but not persisted
     if (analysis.status === 'clean') {
-      // Clean images are not saved, just return the analysis result
+      // Clean images are not saved, clear any sensitive data from memory concurrently
+      if (Array.isArray(images)) {
+        await Promise.all(images.map(async (img) => {
+          if (img && typeof img === 'object') {
+            return new Promise<void>((resolve) => {
+              if ('base64' in img) delete img.base64;
+              if ('url' in img) delete img.url;
+              resolve();
+            });
+          }
+        }));
+      }
       return reply.status(200).send({ success: true, message: 'Analyzed - Clean image not saved', statusCode: 200, data: { id: null, status: analysis.status, findings: analysis.findings } } as IAPIResponse);
     }
     
