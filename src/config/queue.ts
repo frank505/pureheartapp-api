@@ -64,6 +64,7 @@ export const JOB_TYPES = {
   USER_CLEANUP: {
     DELETE_UNVERIFIED: 'delete-unverified-users',
     CLEANUP_SESSIONS: 'cleanup-expired-sessions',
+    DELETE_SENSITIVE_IMAGE: 'delete-sensitive-image',
   },
   ANALYTICS: {
     TRACK_EVENT: 'track-user-event',

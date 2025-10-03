@@ -45,6 +45,7 @@ export interface IUserPublic {
   firstName: string;
   lastName: string;
   username: string;
+  userType: 'user' | 'partner';
   avatar?: string | null;
   isEmailVerified: boolean;
   isActive: boolean;
@@ -328,12 +329,14 @@ export interface IGoogleLoginRequest {
   init_sent_accountability_id?: string;
   init_reciever_sent_accountablity_id?: string;
   invitedEmails?: string[];
+  userType?: 'user' | 'partner';
 }
 
 export interface IAppleLoginRequest {
   idToken: string;
   onboardingData: OnboardingState;
   accountability_partner_hash?: string;
+  userType?: 'user' | 'partner';
 }
 
 export interface IMatchInstallRequest {

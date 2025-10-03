@@ -14,6 +14,7 @@ export interface IAccountabilityCheckIn {
   note?: string | null;
   visibility: CheckInVisibility;
   status: CheckInStatus; // marks whether this check-in was a victory day or a relapse
+  isAutomatic?: boolean; // true if this was an automatic check-in created by the system
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -21,7 +22,7 @@ export interface IAccountabilityCheckIn {
 
 type AccountabilityCheckInCreation = Optional<
   IAccountabilityCheckIn,
-  'id' | 'partnerIds' | 'groupIds' | 'note' | 'deletedAt' | 'createdAt' | 'updatedAt'
+  'id' | 'partnerIds' | 'groupIds' | 'note' | 'isAutomatic' | 'deletedAt' | 'createdAt' | 'updatedAt'
 >;
 
 class AccountabilityCheckIn
@@ -36,6 +37,7 @@ class AccountabilityCheckIn
   public note!: string | null;
   public visibility!: CheckInVisibility;
   public status!: CheckInStatus;
+  public isAutomatic!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
   public readonly deletedAt!: Date | null;
@@ -75,6 +77,7 @@ AccountabilityCheckIn.init(
     note: { type: DataTypes.TEXT, allowNull: true },
     visibility: { type: DataTypes.ENUM('private', 'partner', 'group'), allowNull: false, defaultValue: 'private' },
   status: { type: DataTypes.ENUM('victory', 'relapse'), allowNull: false, defaultValue: 'victory' },
+    isAutomatic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_automatic' },
     createdAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'created_at' },
     updatedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'updated_at' },
     deletedAt: { type: DataTypes.DATE, allowNull: true, field: 'deleted_at' },

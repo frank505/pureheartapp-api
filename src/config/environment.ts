@@ -80,6 +80,15 @@ interface EnvironmentConfig {
   // RevenueCat (optional)
   REVENUECAT_WEBHOOK_SECRET?: string;
   REVENUECAT_ENTITLEMENT_PREMIUM?: string;
+
+  // Screenshot storage (S3)
+  SCREENSHOT_S3_REGION: string;
+  SCREENSHOT_S3_BUCKET: string;
+  SCREENSHOT_S3_ACCESS_KEY_ID: string;
+  SCREENSHOT_S3_SECRET_ACCESS_KEY: string;
+  SCREENSHOT_S3_ENDPOINT?: string;
+  SCREENSHOT_S3_FORCE_PATH_STYLE?: string;
+  SCREENSHOT_S3_PUBLIC_BASE_URL?: string;
 }
 
 /**
@@ -117,6 +126,10 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     'GOOGLE_CLIENT_ID',
     'INVITE_MATCH_WINDOW_SECONDS',
     'PRODUCTION_PATH',
+    'SCREENSHOT_S3_REGION',
+    'SCREENSHOT_S3_BUCKET',
+    'SCREENSHOT_S3_ACCESS_KEY_ID',
+    'SCREENSHOT_S3_SECRET_ACCESS_KEY',
   ];
 
   // Check for missing required environment variables
@@ -179,6 +192,13 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
     PRODUCTION_PATH: process.env.PRODUCTION_PATH!,
   OAUTH_REDIRECT_URI: process.env.OAUTH_REDIRECT_URI,
+  SCREENSHOT_S3_REGION: process.env.SCREENSHOT_S3_REGION!,
+  SCREENSHOT_S3_BUCKET: process.env.SCREENSHOT_S3_BUCKET!,
+  SCREENSHOT_S3_ACCESS_KEY_ID: process.env.SCREENSHOT_S3_ACCESS_KEY_ID!,
+  SCREENSHOT_S3_SECRET_ACCESS_KEY: process.env.SCREENSHOT_S3_SECRET_ACCESS_KEY!,
+  SCREENSHOT_S3_ENDPOINT: process.env.SCREENSHOT_S3_ENDPOINT,
+  SCREENSHOT_S3_FORCE_PATH_STYLE: process.env.SCREENSHOT_S3_FORCE_PATH_STYLE,
+  SCREENSHOT_S3_PUBLIC_BASE_URL: process.env.SCREENSHOT_S3_PUBLIC_BASE_URL,
   } as any;
 
   if (process.env.REVENUECAT_WEBHOOK_SECRET) {
@@ -278,4 +298,16 @@ export const geminiConfig = {
 export const revenuecatConfig = {
   webhookSecret: config.REVENUECAT_WEBHOOK_SECRET,
   entitlementPremium: config.REVENUECAT_ENTITLEMENT_PREMIUM || 'premium',
+};
+
+export const screenshotStorageConfig = {
+  region: config.SCREENSHOT_S3_REGION,
+  bucket: config.SCREENSHOT_S3_BUCKET,
+  credentials: {
+    accessKeyId: config.SCREENSHOT_S3_ACCESS_KEY_ID,
+    secretAccessKey: config.SCREENSHOT_S3_SECRET_ACCESS_KEY,
+  },
+  endpoint: config.SCREENSHOT_S3_ENDPOINT,
+  forcePathStyle: config.SCREENSHOT_S3_FORCE_PATH_STYLE === 'true',
+  publicBaseUrl: config.SCREENSHOT_S3_PUBLIC_BASE_URL,
 };

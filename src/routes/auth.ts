@@ -561,7 +561,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const { idToken, onboardingData, 
       init_sent_accountability_id,
        init_reciever_sent_accountablity_id,
-       invitedEmails
+       invitedEmails,
+       userType
       } = request.body;
    
     const t = await sequelize.transaction();
@@ -592,8 +593,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
           firstName: payload.given_name || '',
           lastName: payload.family_name || '',
           username,
+          userType: userType || 'user',
           isEmailVerified: true,
         }, { transaction: t });
+      } else if (userType && user.userType !== userType) {
+        // Update userType if provided and different from current value
+        user.userType = userType;
+        await user.save({ transaction: t });
       }
 
       if (isRegistration && onboardingData) {
@@ -671,7 +677,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
    * Authenticates a user with an Apple ID token and saves onboarding data.
    */
   fastify.post<{ Body: IAppleLoginRequest }>('/apple-login', async (request, reply) => {
-    const { idToken, onboardingData, accountability_partner_hash } = request.body;
+    const { idToken, onboardingData, accountability_partner_hash, userType } = request.body;
     const t = await sequelize.transaction();
 
     try {
@@ -725,8 +731,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
           firstName,
           lastName,
           username,
+          userType: userType || 'user',
           isEmailVerified: true,
         }, { transaction: t });
+      } else if (userType && user.userType !== userType) {
+        // Update userType if provided and different from current value
+        user.userType = userType;
+        await user.save({ transaction: t });
       }
 
       if (isRegistration && onboardingData) {
@@ -1650,6 +1661,75 @@ export default async function authRoutes(fastify: FastifyInstance) {
         success: false,
         message: 'Failed to update user profile',
         error: 'An error occurred while updating your profile',
+        statusCode: 500,
+      });
+    }
+  });
+
+  /**
+   * Update User Type Endpoint
+   * PATCH /api/auth/user-type
+   *
+   * Updates the authenticated user's userType (user or partner).
+   */
+  fastify.patch<{ Body: { userType: 'user' | 'partner' } }>('/user-type', {
+    preHandler: [authenticate],
+    schema: {
+      body: {
+        type: 'object',
+        required: ['userType'],
+        properties: {
+          userType: { 
+            type: 'string',
+            enum: ['user', 'partner']
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const authenticatedRequest = request as AuthenticatedFastifyRequest;
+      const userId = authenticatedRequest.userId;
+      const { userType } = request.body as { userType: 'user' | 'partner' };
+
+      if (!userType || !['user', 'partner'].includes(userType)) {
+        return reply.status(400).send({
+          success: false,
+          message: 'Validation failed',
+          error: 'userType must be either "user" or "partner"',
+          statusCode: 400,
+        });
+      }
+
+      const user = await User.findByPk(userId);
+
+      if (!user) {
+        return reply.status(404).send({
+          success: false,
+          message: 'User not found',
+          statusCode: 404,
+        });
+      }
+
+      user.userType = userType;
+      await user.save();
+
+      return reply.status(200).send({
+        success: true,
+        message: 'User type updated successfully',
+        data: { 
+          user: user.toPublicJSON(),
+          userType: user.userType
+        },
+        statusCode: 200,
+      });
+
+    } catch (error) {
+      request.log.error({ err: error }, 'Update user type error');
+      return reply.status(500).send({
+        success: false,
+        message: 'Failed to update user type',
+        error: 'An error occurred while updating your user type',
         statusCode: 500,
       });
     }

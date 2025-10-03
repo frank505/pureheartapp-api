@@ -40,6 +40,9 @@ import { scheduleFastingCron, initializeFastingWorker } from './jobs/fastingJobs
 import devicesRoutes from './routes/devices';
 import { initFirebaseIfNeeded } from './services/pushService';
 import { scheduleAccountabilityHealthCron } from './jobs/accountabilityHealthJobs';
+import { scheduleAutomaticCheckInCron } from './jobs/autoCheckinJobs';
+import { initializeUserCleanupWorker } from './jobs/userCleanupJobs';
+import { scheduleScreenshotCleanupCron } from './jobs/screenshotCleanupJobs';
 import waitingListRoutes from './routes/waitingList';
 import reflectionsRoutes from './routes/reflections';
 import userFirstsRoutes from './routes/userFirsts';
@@ -227,6 +230,7 @@ const createServer = async (): Promise<FastifyInstance> => {
     Promise.resolve().then(() => initializeTruthLiesWorker()),
     Promise.resolve().then(() => initFirebaseIfNeeded()),
     Promise.resolve().then(() => initializeFastingWorker()),
+    Promise.resolve().then(() => initializeUserCleanupWorker()),
   ]);
 
   // Schedule recurring jobs in parallel
@@ -235,6 +239,8 @@ const createServer = async (): Promise<FastifyInstance> => {
   Promise.resolve().then(() => scheduleWeeklyReflections()),
     Promise.resolve().then(() => scheduleFastingCron()),
   Promise.resolve().then(() => scheduleAccountabilityHealthCron()),
+    Promise.resolve().then(() => scheduleAutomaticCheckInCron()),
+    Promise.resolve().then(() => scheduleScreenshotCleanupCron()),
   ]);
 
   // Set up Bull Dashboard for queue monitoring

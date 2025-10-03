@@ -42,6 +42,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         partnerIds: { type: 'array', items: { type: 'number' } },
         groupIds: { type: 'array', items: { type: 'number' } },
   status: { type: 'string', enum: ['victory', 'relapse'] },
+        isAutomatic: { type: 'boolean' },
       },
     },
   };
@@ -106,13 +107,15 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           partnerIds: visibility === 'partner' ? partnerIds ?? null : null,
           groupIds: visibility === 'group' ? groupIds ?? null : null,
           status,
+          isAutomatic: false, // Explicitly set to false for manual check-ins
         });
 
         // Update progress and evaluate achievements
   await recordCheckInAndUpdateStreak(userId, checkIn.createdAt, checkIn.getDataValue('status') as any);
         const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
-        if (checkIn.visibility === 'partner' && checkIn.partnerIds) {
+        // Only send notifications for manual check-ins (not automatic ones)
+        if (!checkIn.isAutomatic && checkIn.visibility === 'partner' && checkIn.partnerIds) {
           await Promise.all(
             checkIn.partnerIds.map((partnerId) =>
               PushQueue.sendNotification({
@@ -151,7 +154,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
     }
   );
 
-  // GET /checkins - Get all accountability check-ins for the user
+  // GET /checkins - Get accountability check-ins for the user (manual by default)
   fastify.get(
     '/checkins',
     async (
@@ -162,17 +165,24 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           page?: number;
           limit?: number;
           status?: 'victory' | 'relapse';
+          isAutomatic?: boolean;
         };
       }>,
       reply: FastifyReply
     ) => {
       try {
         const userId = (request as AuthenticatedFastifyRequest).userId;
-  const { from, to, status } = request.query as any;
+  const { from, to, status, isAutomatic } = request.query as any;
         const page = Number(request.query.page) || 1;
         const limit = Number(request.query.limit) || 10;
 
         const where: any = { userId };
+        
+        // Filter by isAutomatic if specified
+        if (isAutomatic !== undefined) {
+          where.isAutomatic = isAutomatic;
+        }
+        
         if (from && to) {
           where.createdAt = {
             [Op.between]: [new Date(from), new Date(to)],
@@ -187,15 +197,19 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           limit,
           offset: (page - 1) * limit,
           order: [['createdAt', 'DESC']],
+          attributes: ['id', 'userId', 'mood', 'note', 'visibility', 'status', 'isAutomatic', 'createdAt', 'updatedAt'],
         });
 
+        const filterType = isAutomatic === true ? 'automatic' : isAutomatic === false ? 'manual' : 'all';
         const response: IAPIResponse = {
           success: true,
-          message: 'Check-ins retrieved successfully',
+          message: `${filterType === 'all' ? 'All' : filterType === 'automatic' ? 'Automatic' : 'Manual'} check-ins retrieved successfully`,
           data: {
             items: rows,
             page,
             totalPages: Math.ceil(count / limit),
+            totalItems: count,
+            filter: filterType,
           },
           statusCode: 200,
         };

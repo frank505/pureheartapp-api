@@ -27,6 +27,8 @@
   "author": "Franklin Akpu",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.901.0",
+    "@aws-sdk/s3-request-presigner": "^3.901.0",
     "@bull-board/api": "^5.10.2",
     "@bull-board/fastify": "^5.10.2",
     "@bull-board/ui": "^5.10.2",

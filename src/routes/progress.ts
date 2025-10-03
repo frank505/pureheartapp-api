@@ -25,6 +25,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         partnerIds: { type: 'array', items: { type: 'number' } },
         groupIds: { type: 'array', items: { type: 'number' } },
   status: { type: 'string', enum: ['victory', 'relapse'] },
+        isAutomatic: { type: 'boolean' },
       },
     },
   } as const;
@@ -75,13 +76,15 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           partnerIds: visibility === 'partner' ? partnerIds ?? null : null,
           groupIds: visibility === 'group' ? groupIds ?? null : null,
           status,
+          isAutomatic: false, // Explicitly set to false for manual check-ins
         });
 
         // Update progress and evaluate achievements
   await recordCheckInAndUpdateStreak(userId, checkIn.createdAt, checkIn.getDataValue('status') as any);
         const newlyUnlocked = await evaluateAndUnlockAchievements(userId);
 
-        if (checkIn.visibility === 'partner' && checkIn.partnerIds) {
+        // Only send notifications for manual check-ins (not automatic ones)
+        if (!checkIn.isAutomatic && checkIn.visibility === 'partner' && checkIn.partnerIds) {
           await Promise.all(
             checkIn.partnerIds.map((partnerId) =>
               PushQueue.sendNotification({

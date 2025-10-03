@@ -1,3 +1,5 @@
+export type UserType = 'user' | 'partner';
+
 export interface IUser {
   id: number;
   email: string;
@@ -5,6 +7,7 @@ export interface IUser {
   firstName: string;
   lastName: string;
   username: string;
+  userType: UserType;
   avatar?: string | null;
   isEmailVerified: boolean;
   isActive: boolean;

@@ -2,6 +2,7 @@ import { DataTypes, Model, Optional, Op } from 'sequelize';
 import bcrypt from 'bcryptjs';
 import sequelize from '../config/database';
 import { IUser, IUserCreate, IUserPublic } from '../types/auth';
+import { UserType } from '../types/user';
 import { securityConfig } from '../config/environment';
 import { generateSecureToken } from '../utils/jwt';
 
@@ -9,7 +10,7 @@ import { generateSecureToken } from '../utils/jwt';
  * User model attributes for Sequelize
  * These define what fields are required when creating a User instance
  */
-interface UserCreationAttributes extends Optional<IUser, 'id' | 'isEmailVerified' | 'isActive' | 'lastLoginAt' | 'passwordResetToken' | 'passwordResetExpires' | 'emailVerificationToken' | 'emailVerificationExpires' | 'createdAt' | 'updatedAt' | 'deletedAt'> {}
+interface UserCreationAttributes extends Optional<IUser, 'id' | 'userType' | 'isEmailVerified' | 'isActive' | 'lastLoginAt' | 'passwordResetToken' | 'passwordResetExpires' | 'emailVerificationToken' | 'emailVerificationExpires' | 'createdAt' | 'updatedAt' | 'deletedAt'> {}
 
 /**
  * User Model Class
@@ -23,6 +24,7 @@ class User extends Model<IUser, UserCreationAttributes> implements IUser {
   public firstName!: string;
   public lastName!: string;
   public username!: string;
+  public userType!: UserType;
   public avatar?: string | null;
   public isEmailVerified!: boolean;
   public isActive!: boolean;
@@ -127,6 +129,7 @@ class User extends Model<IUser, UserCreationAttributes> implements IUser {
       firstName: this.firstName,
       lastName: this.lastName,
       username: this.username,
+      userType: this.userType,
       avatar: this.avatar ?? null,
       isEmailVerified: this.isEmailVerified,
       isActive: this.isActive,
@@ -332,6 +335,19 @@ User.init(
         is: {
           args: /^[a-zA-Z0-9_]+$/,
           msg: 'Username can only contain letters, numbers, and underscores'
+        }
+      }
+    },
+
+    // User type - 'user' or 'partner'
+    userType: {
+      type: DataTypes.ENUM('user', 'partner'),
+      allowNull: false,
+      defaultValue: 'user',
+      validate: {
+        isIn: {
+          args: [['user', 'partner']],
+          msg: 'User type must be either "user" or "partner"'
         }
       }
     },

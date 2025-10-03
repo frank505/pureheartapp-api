@@ -1,4 +1,4 @@
-type InputImage = { url?: string; base64?: string };
+export type InputImage = { url?: string; base64?: string };
 
 export type Finding = { label: string; category?: string; score?: number; raw?: any };
 export type Analysis = { status: 'clean' | 'suspicious' | 'explicit'; summary?: string; findings: Finding[] };
@@ -52,7 +52,22 @@ function guessMimeFromBase64(b64?: string): string {
   return 'image/jpeg';
 }
 
-export async function analyzeImages(images: InputImage[]): Promise<Analysis> {
+export async function prepareImagesForModeration(images: InputImage[]): Promise<Array<{ base64: string; mimeType: string }>> {
+  const prepared: Array<{ base64: string; mimeType: string }> = [];
+  for (const img of images) {
+    if (img.base64) {
+      prepared.push({ base64: img.base64.replace(/^data:[^;]+;base64,/, ''), mimeType: guessMimeFromBase64(img.base64) });
+      continue;
+    }
+    if (img.url) {
+      const fetched = await fetchImageAsBase64(img.url);
+      if (fetched) prepared.push(fetched);
+    }
+  }
+  return prepared;
+}
+
+export async function analyzeImages(images: InputImage[], preResolved?: Array<{ base64: string; mimeType: string }>): Promise<Analysis> {
   const key = process.env.GEMINI_API_KEY;
   const limited = (images || []).slice(0, MAX_IMAGES);
   if (!key) {
@@ -76,17 +91,7 @@ export async function analyzeImages(images: InputImage[]): Promise<Analysis> {
   ];
 
   // Collect image blobs
-  const prepared: Array<{ base64: string; mimeType: string }> = [];
-  for (const img of limited) {
-    if (img.base64) {
-      prepared.push({ base64: img.base64.replace(/^data:[^;]+;base64,/, ''), mimeType: guessMimeFromBase64(img.base64) });
-      continue;
-    }
-    if (img.url) {
-      const fetched = await fetchImageAsBase64(img.url);
-      if (fetched) prepared.push(fetched);
-    }
-  }
+  const prepared = preResolved ?? (await prepareImagesForModeration(limited));
   if (!prepared.length) {
     return { status: 'suspicious', summary: 'No valid images provided for analysis', findings: [] };
   }
