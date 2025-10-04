@@ -10,6 +10,7 @@ function sanitize(base: string): string {
   return s || 'audio_clip';
 }
 
+
 function normalizeDir(dir: string) {
   if (!fs.existsSync(dir)) {
     console.error(`Directory not found: ${dir}`);
