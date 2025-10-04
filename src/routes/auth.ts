@@ -617,11 +617,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
         // Generate general truth/lies if no onboarding data
         await TruthLiesQueueService.addGenerateTruthLiesJob(user.id);
       }
-      if(init_sent_accountability_id || onboardingData.accountabilityPreferences?.invitationHash ){
+      if(init_sent_accountability_id || onboardingData?.accountabilityPreferences?.invitationHash ){
         if(isRegistration){
             await AccountabilityPartner.create({
                 userId: user.id,
-                hash: init_sent_accountability_id || onboardingData.accountabilityPreferences?.invitationHash || '',
+                hash: init_sent_accountability_id || onboardingData?.accountabilityPreferences?.invitationHash || '',
             }, { transaction: t });
         }
       }
