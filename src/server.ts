@@ -52,6 +52,10 @@ import articlesRoutes from './routes/articles';
 import revenuecatRoutes from './routes/revenuecat';
 import screenshotsRoutes from './routes/screenshots';
 import adminLogsRoutes from './routes/adminLogs';
+import commitmentRoutes from './routes/commitments';
+import charityRoutes from './routes/charities';
+import webhookRoutes from './routes/webhooks';
+import { initializeCommitmentCronJobs } from './jobs/commitmentJobs';
 import ARTICLES from './data/articles';
 import Article from './models/Article';
 // Ensure new models are registered before syncing
@@ -70,6 +74,11 @@ import './models/FastJournal';
 import './models/FastMessage';
 import './models/Panic';
 import './models/PanicReply';
+import './models/Action';
+import './models/Commitment';
+import './models/ActionProof';
+import './models/UserServiceStats';
+import './models/RedemptionWall';
 
 /**
  * Create and configure Fastify server instance
@@ -241,6 +250,7 @@ const createServer = async (): Promise<FastifyInstance> => {
   Promise.resolve().then(() => scheduleAccountabilityHealthCron()),
     Promise.resolve().then(() => scheduleAutomaticCheckInCron()),
     Promise.resolve().then(() => scheduleScreenshotCleanupCron()),
+    Promise.resolve().then(() => initializeCommitmentCronJobs()),
   ]);
 
   // Set up Bull Dashboard for queue monitoring
@@ -428,6 +438,9 @@ const createServer = async (): Promise<FastifyInstance> => {
   await fastify.register(articlesRoutes, { prefix: '/api' });
   await fastify.register(revenuecatRoutes, { prefix: '/api' });
   await fastify.register(screenshotsRoutes, { prefix: '/api' });
+  await fastify.register(commitmentRoutes, { prefix: '/api' });
+  await fastify.register(charityRoutes, { prefix: '/api' });
+  await fastify.register(webhookRoutes, { prefix: '/api' });
   await fastify.register(adminLogsRoutes);
 
   // Add graceful shutdown hooks

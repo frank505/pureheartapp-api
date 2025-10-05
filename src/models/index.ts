@@ -49,6 +49,13 @@ import Subscription from './Subscription';
 import SensitiveImage from './SensitiveImage';
 import SensitiveImageFinding from './SensitiveImageFinding';
 import SensitiveImageComment from './SensitiveImageComment';
+import Action from './Action';
+import Commitment from './Commitment';
+import ActionProof from './ActionProof';
+import UserServiceStats from './UserServiceStats';
+import RedemptionWall from './RedemptionWall';
+import CharityOrganization from './CharityOrganization';
+import CharityDonation from './CharityDonation';
 
 User.hasOne(OnboardingData, {
   foreignKey: 'userId',
@@ -246,6 +253,47 @@ UserBadge.belongsTo(Badge, {
 });
 
 // Export all models
+// Charity system associations
+CharityOrganization.hasMany(Commitment, {
+  foreignKey: 'charityId',
+  as: 'commitments',
+});
+
+Commitment.belongsTo(CharityOrganization, {
+  foreignKey: 'charityId',
+  as: 'charity',
+});
+
+CharityOrganization.hasMany(CharityDonation, {
+  foreignKey: 'charityId',
+  as: 'donations',
+});
+
+CharityDonation.belongsTo(CharityOrganization, {
+  foreignKey: 'charityId',
+  as: 'charity',
+});
+
+CharityDonation.belongsTo(Commitment, {
+  foreignKey: 'commitmentId',
+  as: 'commitment',
+});
+
+Commitment.hasMany(CharityDonation, {
+  foreignKey: 'commitmentId',
+  as: 'donations',
+});
+
+CharityDonation.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'donor',
+});
+
+User.hasMany(CharityDonation, {
+  foreignKey: 'userId',
+  as: 'charityDonations',
+});
+
 export {
   sequelize,
   User,
@@ -343,4 +391,11 @@ export default {
   SensitiveImage,
   SensitiveImageFinding,
   SensitiveImageComment,
+  Action,
+  Commitment,
+  ActionProof,
+  UserServiceStats,
+  RedemptionWall,
+  CharityOrganization,
+  CharityDonation,
 };
