@@ -18,18 +18,18 @@ export default async function charityRoutes(fastify: FastifyInstance, options: F
   fastify.get('/charities', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const charities = await CharityOrganization.findAll({
-        where: { 
-          isVerified: true,
-          isActive: true 
+        where: {
+          is_verified: true,
+          is_active: true
         },
         attributes: [
           'id',
-          'name', 
+          'name',
           'category',
           'description',
           'website',
-          'missionStatement',
-          'ein'
+          'mission',
+          'tax_id'
         ],
         order: [['name', 'ASC']]
       });
@@ -65,10 +65,10 @@ export default async function charityRoutes(fastify: FastifyInstance, options: F
       const { id } = request.params;
 
       const charity = await CharityOrganization.findOne({
-        where: { 
+        where: {
           id: parseInt(id),
-          isVerified: true,
-          isActive: true 
+          is_verified: true,
+          is_active: true
         }
       });
 

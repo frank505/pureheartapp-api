@@ -13,6 +13,7 @@
     "audio:normalize": "ts-node scripts/normalizeAudioNames.ts",
     "seed:articles": "ts-node scripts/seedArticles.ts",
     "seed:actions": "ts-node scripts/seedActions.ts",
+  "seed:charities": "ts-node scripts/seedCharityOrganizations.ts",
     "reseed:articles": "ts-node scripts/reseedArticles.ts",
     "docker:dev": "docker-compose up --build",
     "docker:prod": "docker-compose -f docker-compose.prod.yml up --build"

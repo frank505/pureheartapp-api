@@ -183,10 +183,10 @@ class CharityPaymentService {
       }
 
       // If charity has Stripe account, process transfer
-      if (charity.stripeAccountId) {
+      if (charity.stripe_account_id) {
         const transferResult = await this.transferToCharity({
           amount: paymentIntent.amount,
-          charityStripeAccountId: charity.stripeAccountId,
+          charityStripeAccountId: charity.stripe_account_id,
           paymentIntentId: paymentIntent.id,
           description: `Commitment failure donation for commitment ${commitmentId}`,
           metadata: {
@@ -301,10 +301,10 @@ class CharityPaymentService {
       }
 
       // Trigger transfer to charity if Stripe account is set up
-      if (charity?.stripeAccountId) {
+      if (charity?.stripe_account_id) {
         await this.transferToCharity({
           amount: paymentIntent.amount,
-          charityStripeAccountId: charity.stripeAccountId,
+          charityStripeAccountId: charity.stripe_account_id,
           paymentIntentId: paymentIntent.id,
           description: `Commitment failure donation - ${user?.firstName} ${user?.lastName}`,
           metadata: paymentIntent.metadata
@@ -405,7 +405,7 @@ class CharityPaymentService {
 
         // Get charity and user details
         const [charity, user] = await Promise.all([
-          CharityOrganization.findByPk(donation.charityId, { attributes: ['id', 'name', 'contactEmail'] }),
+          CharityOrganization.findByPk(donation.charityId, { attributes: ['id', 'name', 'email'] }),
           User.findByPk(donation.userId, { attributes: ['id', 'firstName', 'lastName'] })
         ]);
 
